@@ -3,9 +3,10 @@
 Site estático para GitHub Pages com:
 
 - Dashboard de obras e metas do PDM.
-- Formulário diário para fiscais.
+- Formulário diário para fiscais, com checklist de equipe/equipamentos.
 - Histórico local no navegador.
 - Exportação de relatórios para JSON, PDF via impressão do navegador e texto para WhatsApp.
+- Tema claro como padrão e tema escuro opcional no botão discreto do topo.
 - Importação de relatórios JSON para atualizar o dashboard e baixar novo `data/obras.json`.
 
 ## Como publicar no GitHub Pages
@@ -24,13 +25,15 @@ Site estático para GitHub Pages com:
 - `script.js`: lógica do dashboard, relatórios, exportações e importações.
 - `data/obras.json`: base pública das obras exibidas no dashboard.
 
+O tema claro é o padrão para todo usuário que entra pela primeira vez. O tema escuro fica salvo apenas no navegador de quem ativou.
+
 ## Fluxo recomendado
 
 ### Fiscal
 
 1. Abre o site.
 2. Vai em **Relatório do fiscal**.
-3. Preenche data, horários, obra, metros executados, observações e fotos.
+3. Preenche data, horários, obra, metros executados, checklist de equipe/equipamentos, observações e fotos.
 4. Salva o relatório.
 5. Em **Histórico**, seleciona um período.
 6. Exporta:

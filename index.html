@@ -21,12 +21,15 @@
         </span>
       </a>
 
-      <nav class="tabs" aria-label="Navegação principal">
-        <button class="tab-button active" data-target="dashboard">Dashboard</button>
-        <button class="tab-button" data-target="relatorio">Relatório do fiscal</button>
-        <button class="tab-button" data-target="historico">Histórico</button>
-        <button class="tab-button" data-target="atualizar">Atualizar dados</button>
-      </nav>
+      <div class="topbar-actions">
+        <nav class="tabs" aria-label="Navegação principal">
+          <button class="tab-button active" data-target="dashboard">Dashboard</button>
+          <button class="tab-button" data-target="relatorio">Relatório do fiscal</button>
+          <button class="tab-button" data-target="historico">Histórico</button>
+          <button class="tab-button" data-target="atualizar">Atualizar dados</button>
+        </nav>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema claro/escuro">☾</button>
+      </div>
     </header>
 
     <main>
@@ -40,11 +43,7 @@
             <button class="ghost-action" data-target="dashboard">Ver progresso</button>
           </div>
         </div>
-        <div class="hero-pattern" aria-hidden="true">
-          <span></span><span></span><span></span>
-          <span></span><span></span><span></span>
-          <span></span><span></span><span></span>
-        </div>
+
       </section>
 
       <section id="dashboard" class="tab-panel active" aria-labelledby="dashboard-title">
@@ -136,6 +135,71 @@
                 <input id="executedMeters" name="executedMeters" type="number" min="0" step="0.01" placeholder="0" required />
               </label>
             </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Equipe e recursos em campo</legend>
+            <div class="field-row two-columns">
+              <label>Encarregado da frente
+                <input id="crewLeader" name="crewLeader" type="text" placeholder="Nome do encarregado" />
+              </label>
+              <label>Atividade principal
+                <input id="mainActivity" name="mainActivity" type="text" placeholder="Ex.: limpeza de canaleta, recomposição de talude..." />
+              </label>
+            </div>
+            <div class="checklist-grid" id="resourceChecklist" aria-label="Checklist de equipe e equipamentos">
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Encarregado" />
+                <span>Encarregado</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Chefe de boletim" />
+                <span>Chefe de boletim</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Motorista" />
+                <span>Motorista</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Operador EGP" />
+                <span>Operador EGP</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Operador EPP" />
+                <span>Operador EPP</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Ajudante" />
+                <span>Ajudante</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Caminhão Cabine Articulada 4x2" />
+                <span>Caminhão Cabine Articulada 4x2</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" />
+                <input type="number" class="resource-qty" min="0" step="1" value="0" aria-label="Quantidade de caminhão 6x4" />
+                <span>Caminhão 6x4</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" />
+                <input type="number" class="resource-qty" min="0" step="1" value="0" aria-label="Quantidade de mini escavadeira" />
+                <span>Mini escavadeira</span>
+              </label>
+              <label class="checklist-item">
+                <input type="checkbox" class="resource-present" checked />
+                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Escavadeira hidráulica" />
+                <span>Escavadeira hidráulica</span>
+              </label>
+            </div>
+            <small class="field-help">Use a quantidade para gerar o texto do relatório. Itens desmarcados serão salvos com quantidade 0.</small>
           </fieldset>
 
           <fieldset>
@@ -259,6 +323,10 @@
         </div>
       </section>
     </main>
+
+    <footer class="footer-accent" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </footer>
   </div>
 
   <template id="activityTemplate">

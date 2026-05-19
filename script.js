@@ -1,6 +1,7 @@
 const STORAGE = {
   reports: "trecho2_reports_v1",
-  works: "trecho2_works_override_v1"
+  works: "trecho2_works_override_v1",
+  theme: "trecho2_theme_v1"
 };
 
 const state = {
@@ -108,7 +109,32 @@ function showToast(message) {
   window.setTimeout(() => toast.classList.remove("show"), 3400);
 }
 
+function setupTheme() {
+  const savedTheme = localStorage.getItem(STORAGE.theme) || "light";
+  applyTheme(savedTheme);
+
+  const button = $("#themeToggle");
+  button?.addEventListener("click", () => {
+    const nextTheme = document.body.classList.contains("dark-theme") ? "light" : "dark";
+    applyTheme(nextTheme);
+    localStorage.setItem(STORAGE.theme, nextTheme);
+  });
+}
+
+function applyTheme(theme) {
+  const isDark = theme === "dark";
+  document.body.classList.toggle("dark-theme", isDark);
+
+  const button = $("#themeToggle");
+  if (!button) return;
+  button.textContent = isDark ? "☀" : "☾";
+  button.title = isDark ? "Usar tema claro" : "Usar tema escuro";
+  button.setAttribute("aria-label", button.title);
+  button.setAttribute("aria-pressed", String(isDark));
+}
+
 async function init() {
+  setupTheme();
   setupNavigation();
   setupReportForm();
   setupHistoryExports();
@@ -299,6 +325,7 @@ function fillWorkFields() {
 }
 
 function setupReportForm() {
+  setupResourceChecklist();
   $("#addActivityBtn").addEventListener("click", () => addActivityRow());
   $("#photoInput").addEventListener("change", handlePhotos);
   $("#clearFormBtn").addEventListener("click", clearReportForm);
@@ -312,6 +339,52 @@ function addActivityRow(time = "", description = "") {
   $(".activity-description", item).value = description;
   $(".remove-activity", item).addEventListener("click", () => item.remove());
   $("#activityList").appendChild(item);
+}
+
+function setupResourceChecklist() {
+  $$("#resourceChecklist .checklist-item").forEach(item => {
+    const checkbox = $(".resource-present", item);
+    const quantityInput = $(".resource-qty", item);
+
+    quantityInput.addEventListener("input", () => {
+      if (toNumber(quantityInput.value) > 0) checkbox.checked = true;
+    });
+
+    checkbox.addEventListener("change", () => {
+      if (!checkbox.checked) quantityInput.value = "0";
+      if (checkbox.checked && toNumber(quantityInput.value) === 0) quantityInput.value = "1";
+    });
+  });
+}
+
+function collectResourceChecklist() {
+  return $$("#resourceChecklist .checklist-item").map(item => {
+    const name = $("span", item).textContent.trim();
+    const present = $(".resource-present", item).checked;
+    const quantity = present ? Math.max(0, Math.round(toNumber($(".resource-qty", item).value))) : 0;
+    return { nome: name, quantidade: quantity, presente: present && quantity > 0 };
+  });
+}
+
+function resourceChecklistToText(resources = []) {
+  if (!resources.length) return "Não informado.";
+  return resources
+    .map(resource => `* ${toNumber(resource.quantidade)} ${resource.nome}.`)
+    .join("\n");
+}
+
+function resourceChecklistToHtml(resources = []) {
+  if (!resources.length) return "<li>Não informado.</li>";
+  return resources
+    .map(resource => `<li><strong>${toNumber(resource.quantidade)}</strong> ${escapeHtml(resource.nome)}.</li>`)
+    .join("");
+}
+
+function resourceChecklistInline(resources = []) {
+  if (!resources.length) return "Checklist não informado.";
+  const active = resources.filter(resource => toNumber(resource.quantidade) > 0);
+  if (!active.length) return "Sem equipe/equipamentos marcados.";
+  return active.map(resource => `${toNumber(resource.quantidade)} ${resource.nome}`).join(" • ");
 }
 
 async function handlePhotos(event) {
@@ -400,6 +473,9 @@ function saveReportFromForm(event) {
     obraId: $("#obraSelect").value,
     obraNome: selectedWork?.nome || "",
     tipoServico: $("#serviceType").value.trim(),
+    encarregado: $("#crewLeader").value.trim(),
+    atividadePrincipal: $("#mainActivity").value.trim(),
+    equipeRecursos: collectResourceChecklist(),
     kmInicio: $("#kmStart").value.trim(),
     kmFim: $("#kmEnd").value.trim(),
     metaPdmMetros: toNumber($("#plannedMeters").value),
@@ -479,6 +555,11 @@ function renderHistory() {
           <button class="tiny-button delete" data-delete-report="${report.id}">Excluir</button>
         </div>
       </div>
+      <div class="history-checklist">
+        <strong>Encarregado:</strong> ${escapeHtml(report.encarregado || "-")}<br>
+        <strong>Atividade:</strong> ${escapeHtml(report.atividadePrincipal || "-")}<br>
+        <strong>Equipe/equipamentos:</strong> ${escapeHtml(resourceChecklistInline(report.equipeRecursos || []))}
+      </div>
       <p>${escapeHtml(report.condicoesExecucao || report.naoConformidades || "Sem observações adicionais.")}</p>
       ${report.fotos?.length ? `<div class="photo-preview">${report.fotos.map((photo, index) => `<img src="${photo.dataUrl}" alt="Foto ${index + 1} do relatório" />`).join("")}</div>` : ""}
     </article>
@@ -551,6 +632,9 @@ function reportToText(report) {
     `*Clima:* ${report.clima || "-"}\n` +
     `*Obra:* ${report.obraId || "-"} - ${report.obraNome || "-"}\n` +
     `*Serviço:* ${report.tipoServico || "-"}\n` +
+    `*Encarregado:* ${report.encarregado || "-"}\n` +
+    `*Atividade:* ${report.atividadePrincipal || "-"}\n\n` +
+    `*Equipe/equipamentos:*\n${resourceChecklistToText(report.equipeRecursos || [])}\n\n` +
     `*KM:* ${report.kmInicio || "-"} → ${report.kmFim || "-"}\n` +
     `*Meta PDM:* ${formatMeters(report.metaPdmMetros)}\n` +
     `*Executado no dia:* ${formatMeters(report.metrosExecutadosDia)}\n\n` +
@@ -585,6 +669,8 @@ function printReports(reports) {
           .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 18px; margin: 14px 0; }
           .label { font-weight: bold; color: var(--blue-dark); }
           ul { padding-left: 18px; }
+          .checklist { background: #f4f8fa; border: 1px solid var(--line); padding: 12px; margin: 14px 0; }
+          .checklist p { margin: 0 0 8px; }
           .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
           .photos img { width: 100%; height: 150px; object-fit: cover; border: 1px solid var(--line); }
           @page { margin: 16mm; }
@@ -606,6 +692,12 @@ function printReports(reports) {
               <div><span class="label">Executado no dia:</span> ${formatMeters(report.metrosExecutadosDia)}</div>
               <div><span class="label">Meta PDM:</span> ${formatMeters(report.metaPdmMetros)}</div>
               <div><span class="label">Base:</span> ${escapeHtml(report.base || "-")}</div>
+            </div>
+            <div class="checklist">
+              <p><span class="label">Encarregado:</span> ${escapeHtml(report.encarregado || "-")}</p>
+              <p><span class="label">Atividade:</span> ${escapeHtml(report.atividadePrincipal || "-")}</p>
+              <h3>Equipe/equipamentos</h3>
+              <ul>${resourceChecklistToHtml(report.equipeRecursos || [])}</ul>
             </div>
             <h3>Atividades por horário</h3>
             <ul>${(report.atividades || []).map(activity => `<li><strong>${escapeHtml(activity.hora || "--:--")}</strong> - ${escapeHtml(activity.descricao || "")}</li>`).join("") || "<li>Sem atividades registradas.</li>"}</ul>
