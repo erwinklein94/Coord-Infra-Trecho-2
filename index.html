@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trecho 2 | Controle de Infraestrutura Ferroviária</title>
+  <meta name="description" content="Controle de relatórios diários e dashboard de metas de infraestrutura ferroviária do Trecho 2." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="#dashboard" aria-label="Ir para o dashboard">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <span>
+          <strong>Trecho 2</strong>
+          <small>Infraestrutura ferroviária</small>
+        </span>
+      </a>
+
+      <nav class="tabs" aria-label="Navegação principal">
+        <button class="tab-button active" data-target="dashboard">Dashboard</button>
+        <button class="tab-button" data-target="relatorio">Relatório do fiscal</button>
+        <button class="tab-button" data-target="historico">Histórico</button>
+        <button class="tab-button" data-target="atualizar">Atualizar dados</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero section-card">
+        <div>
+          <p class="eyebrow">Plano de Manutenção • PDM</p>
+          <h1>Controle de metas de infraestrutura do Trecho 2</h1>
+          <p class="hero-text">Registre a fiscalização diária, exporte relatórios e acompanhe a evolução das obras de lastro, sublastro, drenagem, taludes, bueiros, canaletas e demais itens que sustentam a via.</p>
+          <div class="hero-actions">
+            <button class="primary-action" data-target="relatorio">Novo relatório</button>
+            <button class="ghost-action" data-target="dashboard">Ver progresso</button>
+          </div>
+        </div>
+        <div class="hero-pattern" aria-hidden="true">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </div>
+      </section>
+
+      <section id="dashboard" class="tab-panel active" aria-labelledby="dashboard-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Visão da coordenação</p>
+            <h2 id="dashboard-title">Dashboard das obras</h2>
+          </div>
+          <div class="toolbar">
+            <input id="dashboardSearch" type="search" placeholder="Buscar obra, KM ou serviço" aria-label="Buscar obra" />
+            <select id="statusFilter" aria-label="Filtrar por status">
+              <option value="todos">Todos os status</option>
+              <option value="Planejada">Planejada</option>
+              <option value="Em andamento">Em andamento</option>
+              <option value="Atenção">Atenção</option>
+              <option value="Concluída">Concluída</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <div class="dashboard-grid" id="obraCards"></div>
+      </section>
+
+      <section id="relatorio" class="tab-panel" aria-labelledby="relatorio-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Preenchimento dos fiscais</p>
+            <h2 id="relatorio-title">Relatório diário de fiscalização</h2>
+          </div>
+          <span class="hint-pill">As informações ficam salvas neste navegador.</span>
+        </div>
+
+        <form id="reportForm" class="section-card form-grid">
+          <fieldset>
+            <legend>Identificação</legend>
+            <div class="field-row two-columns">
+              <label>Fiscal
+                <input id="fiscalName" name="fiscalName" type="text" placeholder="Nome do fiscal" required />
+              </label>
+              <label>Data
+                <input id="reportDate" name="reportDate" type="date" required />
+              </label>
+            </div>
+            <div class="field-row three-columns">
+              <label>Turno
+                <select id="shift" name="shift">
+                  <option>Diurno</option>
+                  <option>Noturno</option>
+                  <option>Integral</option>
+                </select>
+              </label>
+              <label>Clima
+                <select id="weather" name="weather">
+                  <option>Estável</option>
+                  <option>Chuva</option>
+                  <option>Nublado</option>
+                  <option>Calor intenso</option>
+                  <option>Outro</option>
+                </select>
+              </label>
+              <label>Base / Local de partida
+                <input id="baseLocation" name="baseLocation" type="text" placeholder="Ex.: Base Trecho 2" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Obra acompanhada</legend>
+            <div class="field-row two-columns">
+              <label>Obra / frente de serviço
+                <select id="obraSelect" name="obraSelect" required></select>
+              </label>
+              <label>Tipo de serviço
+                <input id="serviceType" name="serviceType" type="text" placeholder="Ex.: Canaleta, bueiro, talude, lastro" />
+              </label>
+            </div>
+            <div class="field-row four-columns">
+              <label>KM inicial
+                <input id="kmStart" name="kmStart" type="text" placeholder="Ex.: 101+200" />
+              </label>
+              <label>KM final
+                <input id="kmEnd" name="kmEnd" type="text" placeholder="Ex.: 101+900" />
+              </label>
+              <label>Meta PDM (m)
+                <input id="plannedMeters" name="plannedMeters" type="number" min="0" step="0.01" placeholder="700" />
+              </label>
+              <label>Executado no dia (m)
+                <input id="executedMeters" name="executedMeters" type="number" min="0" step="0.01" placeholder="0" required />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Atividades por horário</legend>
+            <div id="activityList" class="activity-list"></div>
+            <button type="button" class="secondary-action" id="addActivityBtn">+ Adicionar horário</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>Condições, segurança e observações</legend>
+            <div class="field-row two-columns">
+              <label>Condições da execução
+                <textarea id="qualityNotes" rows="4" placeholder="Qualidade observada, recursos, impedimentos, equipes, equipamentos..."></textarea>
+              </label>
+              <label>Segurança / interferências
+                <textarea id="safetyNotes" rows="4" placeholder="Sinalização, bloqueio, riscos, pontos de atenção..."></textarea>
+              </label>
+            </div>
+            <label>Não conformidades ou pendências
+              <textarea id="nonConformities" rows="3" placeholder="Registre pendências, retrabalho necessário ou nenhuma ocorrência."></textarea>
+            </label>
+            <label>Fotos da fiscalização
+              <input id="photoInput" type="file" accept="image/*" multiple />
+              <small class="field-help">As fotos são comprimidas e salvas localmente no navegador. Para muitos registros, prefira exportar JSON/PDF com frequência.</small>
+            </label>
+            <div id="photoPreview" class="photo-preview"></div>
+          </fieldset>
+
+          <div class="form-actions">
+            <button type="submit" class="primary-action">Salvar relatório</button>
+            <button type="button" class="ghost-action" id="clearFormBtn">Limpar formulário</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="historico" class="tab-panel" aria-labelledby="historico-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Consulta local</p>
+            <h2 id="historico-title">Histórico de relatórios</h2>
+          </div>
+          <div class="toolbar">
+            <input id="periodStart" type="date" aria-label="Data inicial" />
+            <input id="periodEnd" type="date" aria-label="Data final" />
+          </div>
+        </div>
+
+        <div class="section-card export-card">
+          <div>
+            <h3>Exportar período selecionado</h3>
+            <p>Use JSON para enviar à coordenação e alimentar o dashboard. PDF/WhatsApp servem para comunicação e registro visual.</p>
+          </div>
+          <div class="export-actions">
+            <button class="primary-action" id="exportJsonBtn">Baixar JSON</button>
+            <button class="secondary-action" id="exportPdfBtn">Gerar PDF</button>
+            <button class="whatsapp-action" id="exportWhatsBtn">Enviar texto WhatsApp</button>
+          </div>
+        </div>
+
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <section id="atualizar" class="tab-panel" aria-labelledby="atualizar-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Rotina da coordenação</p>
+            <h2 id="atualizar-title">Atualizar dados do dashboard</h2>
+          </div>
+          <span class="hint-pill">Fluxo pensado para GitHub Pages</span>
+        </div>
+
+        <div class="update-layout">
+          <article class="section-card">
+            <h3>1. Importar relatórios JSON dos fiscais</h3>
+            <p>Após receber os arquivos JSON, importe aqui. O sistema soma os metros executados por obra e evita duplicidade quando o mesmo relatório já foi aplicado.</p>
+            <label class="file-drop">Selecionar JSON dos fiscais
+              <input id="importReportsInput" type="file" accept="application/json,.json" multiple />
+            </label>
+            <div id="importPreview" class="import-preview"></div>
+            <button class="primary-action" id="applyReportsBtn" disabled>Aplicar no dashboard local</button>
+          </article>
+
+          <article class="section-card">
+            <h3>2. Baixar base atualizada para commit</h3>
+            <p>Depois de aplicar os relatórios, baixe o arquivo e substitua <code>data/obras.json</code> no repositório. Faça commit no GitHub para todos verem o dashboard atualizado.</p>
+            <button class="primary-action" id="downloadWorksBtn">Baixar obras.json atualizado</button>
+            <button class="ghost-action" id="resetLocalDataBtn">Voltar para base do repositório</button>
+          </article>
+
+          <article class="section-card manual-card">
+            <h3>Adicionar obra manualmente</h3>
+            <div class="field-row two-columns">
+              <label>ID da obra
+                <input id="newWorkId" type="text" placeholder="OBR-006" />
+              </label>
+              <label>Status
+                <select id="newWorkStatus">
+                  <option>Planejada</option>
+                  <option>Em andamento</option>
+                  <option>Atenção</option>
+                  <option>Concluída</option>
+                </select>
+              </label>
+            </div>
+            <label>Nome da obra
+              <input id="newWorkName" type="text" placeholder="Ex.: Reconformação de talude - KM 120+000" />
+            </label>
+            <div class="field-row three-columns">
+              <label>Frente
+                <input id="newWorkFront" type="text" placeholder="Drenagem" />
+              </label>
+              <label>Meta (m)
+                <input id="newWorkGoal" type="number" min="0" step="0.01" placeholder="700" />
+              </label>
+              <label>Executado (m)
+                <input id="newWorkDone" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+            </div>
+            <button class="secondary-action" id="addWorkBtn">Adicionar ao dashboard local</button>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <template id="activityTemplate">
+    <div class="activity-item">
+      <input type="time" class="activity-time" aria-label="Horário da atividade" />
+      <input type="text" class="activity-description" placeholder="Descrição da atividade realizada" aria-label="Descrição da atividade" />
+      <button type="button" class="icon-button remove-activity" aria-label="Remover atividade">×</button>
+    </div>
+  </template>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="script.js"></script>
+</body>
+</html>
