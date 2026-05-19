@@ -17,41 +17,27 @@
       </div>
     </div>
 
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar entre tema claro e escuro">
-      <span class="theme-dot" aria-hidden="true"></span>
-      <span id="themeToggleText">Tema escuro</span>
-    </button>
-  </header>
-
-  <main>
-    <section class="hero">
-      <div class="hero-copy">
-        <span class="eyebrow">Controle operacional</span>
-        <h1>Dashboard do Plano de Manutenção — Trecho 2</h1>
-        <p>
-          Acompanhamento da evolução de limpeza de lastro e obras de infraestrutura ferroviária
-          a partir da planilha principal do PDM.
-        </p>
-      </div>
-
-      <div class="hero-panel">
-        <div class="mini-metric">
-          <span>Fonte de dados</span>
-          <strong id="sourceLabel">Carregando...</strong>
-        </div>
-        <div class="mini-metric">
-          <span>Atualização</span>
-          <strong id="lastUpdateLabel">—</strong>
-        </div>
-      </div>
-    </section>
-
     <nav class="tabs" aria-label="Navegação do dashboard">
       <button class="tab active" type="button" data-panel="overview">Visão geral</button>
       <button class="tab" type="button" data-panel="limpeza">Limpeza de lastro</button>
       <button class="tab" type="button" data-panel="obras">Obras DR</button>
       <button class="tab" type="button" data-panel="dados">Fonte de dados</button>
     </nav>
+
+    <div class="header-actions">
+      <div class="update-pill" title="Data da última atualização carregada">
+        <span>Atualizado</span>
+        <strong id="lastUpdateLabel">—</strong>
+      </div>
+
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar entre tema claro e escuro">
+        <span class="theme-dot" aria-hidden="true"></span>
+        <span id="themeToggleText">Tema escuro</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
 
     <section class="status-message" id="statusMessage" role="status" aria-live="polite"></section>
 

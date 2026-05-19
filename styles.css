@@ -77,8 +77,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px clamp(18px, 4vw, 56px);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 14px clamp(16px, 4vw, 48px);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
 }
@@ -139,10 +139,42 @@ button {
   box-shadow: 0 0 0 4px var(--yellow-soft);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: max-content;
+}
+
+.update-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.update-pill span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.update-pill strong {
+  color: var(--navy);
+  font-size: 13px;
+}
+
 main {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 36px 0 60px;
+  padding: 28px 0 60px;
 }
 
 .hero {
@@ -267,18 +299,15 @@ h3 {
 }
 
 .tabs {
-  position: sticky;
-  top: 82px;
-  z-index: 15;
   display: flex;
+  justify-content: center;
   gap: 8px;
-  padding: 8px;
-  margin-bottom: 20px;
+  min-width: 0;
+  padding: 6px;
   overflow-x: auto;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
-  backdrop-filter: blur(14px);
 }
 
 .tab {
@@ -293,7 +322,11 @@ h3 {
 
 .tab.active {
   color: #ffffff;
-  background: var(--navy-2);
+  background: #084f7b;
+}
+
+body.dark .tab.active {
+  background: #0b5a86;
 }
 
 .status-message {
@@ -785,8 +818,14 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .site-header {
+    flex-wrap: wrap;
+  }
+
   .tabs {
-    top: 76px;
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-start;
     border-radius: 24px;
   }
 
@@ -802,7 +841,16 @@ th {
   }
 
   .site-header {
-    padding: 14px 12px;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .header-actions {
+    gap: 8px;
+  }
+
+  .update-pill span {
+    display: none;
   }
 
   .brand-name {

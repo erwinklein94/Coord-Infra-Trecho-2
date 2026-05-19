@@ -442,11 +442,13 @@ function renderAll() {
 }
 
 function renderHeaderMeta() {
-  document.getElementById("sourceLabel").textContent = state.sourceLabel;
-  document.getElementById("lastUpdateLabel").textContent = latestDateLabel([
-    state.limpeza.generatedAt,
-    state.obras.generatedAt,
-  ]);
+  const lastUpdate = document.getElementById("lastUpdateLabel");
+  if (lastUpdate) {
+    lastUpdate.textContent = latestDateLabel([
+      state.limpeza.generatedAt,
+      state.obras.generatedAt,
+    ]);
+  }
 }
 
 function renderOverview() {
