@@ -104,14 +104,14 @@ async function loadData() {
   try {
     state.limpeza = await loadLimpeza(config);
   } catch (error) {
-    state.loadErrors.push(`Limpeza de lastro: ${error.message}`);
+    state.loadErrors.push(`Limpeza Geral: ${error.message}`);
     state.limpeza = await fetchJson(DEFAULT_FILES.limpezaJson);
   }
 
   try {
     state.obras = await loadObras(config);
   } catch (error) {
-    state.loadErrors.push(`Obras DR: ${error.message}`);
+    state.loadErrors.push(`Obras: ${error.message}`);
     state.obras = await fetchJson(DEFAULT_FILES.obrasJson);
   }
 
@@ -163,8 +163,8 @@ async function loadLimpeza(config) {
     const matrix = parseCsv(text);
     const rows = normalizeLimpezaFromMatrix(matrix);
     return {
-      title: "ZBV-ZAR PDM Limpeza DR",
-      sourceSheet: "ZBV-ZAR PDM Limpeza DR",
+      title: "ZBV-ZAR PDM Limpeza",
+      sourceSheet: "ZBV-ZAR PDM Limpeza",
       generatedAt: new Date().toISOString(),
       rows,
       subSummary: calculateSubSummary(rows),
@@ -184,8 +184,8 @@ async function loadObras(config) {
     const matrix = parseCsv(text);
     const rows = normalizeObrasFromMatrix(matrix);
     return {
-      title: "ZBV-ZAR Obras DR",
-      sourceSheet: "ZBV-ZAR Obras DR",
+      title: "ZBV-ZAR Obras",
+      sourceSheet: "ZBV-ZAR Obras",
       generatedAt: new Date().toISOString(),
       rows,
     };
@@ -461,10 +461,10 @@ function renderOverview() {
   const obrasAndamento = obraRows.filter((row) => statusToProgress(row.status) > 0 && statusToProgress(row.status) < 1).length;
 
   document.getElementById("overviewKpis").innerHTML = [
-    kpiCard("Limpeza planejada", formatMeters(planejado), `${limpezaRows.length} frentes cadastradas`),
+    kpiCard("Limpeza planejada", formatMeters(planejado), `${limpezaRows.length} equipamentos cadastrados`),
     kpiCard("Limpeza executada", formatMeters(realizado), `${formatPercent(pct)} do planejado`),
     kpiCard("Saldo de limpeza", formatMeters(Math.max(planejado - realizado, 0)), "metros restantes"),
-    kpiCard("Obras DR", String(obraRows.length), `${obrasAndamento} em andamento • ${obrasConcluidas} concluída(s)`),
+    kpiCard("Obras", String(obraRows.length), `${obrasAndamento} em andamento • ${obrasConcluidas} concluída(s)`),
   ].join("");
 
   document.getElementById("overviewSubList").innerHTML = (state.limpeza.subSummary || [])
@@ -512,7 +512,6 @@ function renderLimpeza() {
       const rows = limpezaRowsForSub(summary.sub);
       const haystack = normalizeHeader([
         summary.sub,
-        summary.sbs?.join(" "),
         rows.map((row) => `${row.equipInfra} ${row.atividade} ${row.sb}`).join(" "),
       ].join(" "));
       return haystack.includes(search);
@@ -528,29 +527,30 @@ function renderLimpeza() {
   container.innerHTML = summaries.map((summary) => {
     const rows = limpezaRowsForSub(summary.sub);
     const activityBadges = Object.entries(summary.atividades || {})
-      .map(([name, count]) => `<span class="badge">${escapeHtml(name)}: ${count}</span>`)
+      .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
+      .map(([name, count]) => `<span class="badge">${escapeHtml(String(name).toLowerCase())}: ${count}</span>`)
       .join("");
 
-    const sbBadges = (summary.sbs || [])
-      .map((sb) => `<span class="badge green">${escapeHtml(sb)}</span>`)
-      .join("");
-
-    const tableRows = rows.map((row) => `
-      <tr>
-        <td>${escapeHtml(row.equipInfra)}</td>
-        <td>${escapeHtml(row.atividade)}</td>
-        <td>${formatKmRange(row.kmi, row.kmf)}</td>
-        <td>${formatMeters(row.ext)}</td>
-        <td>${formatMeters(row.extReal)}</td>
-        <td>${formatPercent(row.percentualReal)}</td>
-      </tr>
+    const detailCards = rows.map((row) => `
+      <div class="detail-row">
+        <div class="detail-row-head">
+          <strong>${escapeHtml(row.equipInfra || "—")}</strong>
+          <span>${formatPercent(row.percentualReal)}</span>
+        </div>
+        <div class="detail-grid">
+          <div><span>ATV</span><strong>${escapeHtml(row.atividade || "—")}</strong></div>
+          <div><span>KM</span><strong>${formatKmRange(row.kmi, row.kmf)}</strong></div>
+          <div><span>EXT</span><strong>${formatMeters(row.ext)}</strong></div>
+          <div><span>EXT real</span><strong>${formatMeters(row.extReal)}</strong></div>
+        </div>
+      </div>
     `).join("");
 
     return `
       <article class="sub-card">
         <div class="sub-top">
           <div>
-            <span class="eyebrow">Limpeza de lastro</span>
+            <span class="eyebrow">Limpeza Geral</span>
             <div class="sub-title">SUB ${escapeHtml(summary.sub)}</div>
           </div>
           <div class="sub-percent">${formatPercent(summary.percentual)}</div>
@@ -568,32 +568,17 @@ function renderLimpeza() {
 
         <div class="meta-grid">
           <div class="meta-item"><span>Faixa KM</span><strong>${formatKmRange(summary.kmInicial, summary.kmFinal)}</strong></div>
-          <div class="meta-item"><span>Frentes</span><strong>${summary.quantidadeFrentes}</strong></div>
+          <div class="meta-item"><span>Equipamentos</span><strong>${summary.quantidadeFrentes}</strong></div>
           <div class="meta-item"><span>Concluídas</span><strong>${summary.frentesConcluidas}</strong></div>
           <div class="meta-item"><span>Em andamento</span><strong>${summary.frentesAndamento}</strong></div>
           <div class="meta-item"><span>Pendentes</span><strong>${summary.frentesPendentes}</strong></div>
         </div>
 
-        <div class="tag-row">${sbBadges || `<span class="badge">Sem SB informado</span>`}</div>
-        <div class="tag-row" style="margin-top: 8px;">${activityBadges}</div>
+        <div class="tag-row activity-summary">${activityBadges || `<span class="badge">Sem ATV informado</span>`}</div>
 
         <details>
-          <summary>Ver frentes da SUB ${escapeHtml(summary.sub)}</summary>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Equip. infra</th>
-                  <th>ATV</th>
-                  <th>KM</th>
-                  <th>EXT</th>
-                  <th>EXT real</th>
-                  <th>% real</th>
-                </tr>
-              </thead>
-              <tbody>${tableRows}</tbody>
-            </table>
-          </div>
+          <summary>Ver equipamentos da SUB ${escapeHtml(summary.sub)}</summary>
+          <div class="detail-list">${detailCards}</div>
         </details>
       </article>
     `;
@@ -638,7 +623,7 @@ function renderObras() {
       <article class="obra-card">
         <div class="obra-top">
           <div>
-            <span class="eyebrow">SUB ${escapeHtml(row.sub || "—")}</span>
+            <span class="eyebrow">SUB ${escapeHtml(row.sub || "—")} - KM ${formatKm(row.km)}</span>
             <div class="obra-title">${escapeHtml(row.descricao)}</div>
           </div>
         </div>
@@ -658,7 +643,6 @@ function renderObras() {
           <div class="meta-item"><span>Tipo</span><strong>${escapeHtml(row.tipoObra || "—")}</strong></div>
           <div class="meta-item"><span>Equipamento</span><strong>${escapeHtml(row.equipamento || "—")}</strong></div>
           <div class="meta-item"><span>Extensão</span><strong>${escapeHtml(row.extEqM || formatMeters(row.extEq || 0))}</strong></div>
-          <div class="meta-item"><span>Prazo</span><strong>${formatPrazo(row.prazoMes)}</strong></div>
         </div>
 
         <p><strong>Motivo:</strong> ${escapeHtml(row.motivo || "—")}</p>

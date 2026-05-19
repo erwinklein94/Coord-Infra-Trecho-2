@@ -7,8 +7,8 @@ Este pacote contém um site estático pronto para **GitHub Pages**, com foco na 
 - Removida a área antiga de relatório diário do fiscal.
 - Removidos controles que exigiam alimentar o site manualmente.
 - Criados dois dashboards:
-  - **ZBV-ZAR PDM Limpeza DR**
-  - **ZBV-ZAR Obras DR**
+  - **ZBV-ZAR PDM Limpeza**
+  - **ZBV-ZAR Obras**
 - Criados cards de limpeza de lastro por **SUB**.
 - Criados cards de obras com status, risco, KM, prazo, equipamento e observação.
 - Adicionada tela **Fonte de dados** para conectar a planilha PDM online publicada em CSV.
@@ -49,8 +49,8 @@ O caminho mais simples é usar Google Planilhas:
 1. Suba a planilha PDM para o Google Drive.
 2. Abra no Google Planilhas.
 3. Confira se as abas continuam com estes dados:
-   - `ZBV-ZAR PDM Limpeza DR`
-   - `ZBV-ZAR Obras DR`
+   - `ZBV-ZAR PDM Limpeza`
+   - `ZBV-ZAR Obras`
 4. Publique cada aba como CSV:
    - **Arquivo > Compartilhar > Publicar na Web**
    - Escolha a aba desejada.
@@ -84,10 +84,10 @@ Evite usar PDF como fonte de dados do dashboard. PDF é bom para visualização 
 
 ## Dados extraídos neste exemplo
 
-- Limpeza de lastro:
+- Limpeza Geral:
   - SUBs: 63, 66, 68, 70, 71, 78
-  - Frentes: 133
-- Obras DR:
+  - Equipamentos: 133
+- Obras:
   - Obras: 15
   - SUBs: 63, 68, 70, 78
 

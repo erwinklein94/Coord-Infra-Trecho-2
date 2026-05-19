@@ -19,8 +19,8 @@
 
     <nav class="tabs" aria-label="Navegação do dashboard">
       <button class="tab active" type="button" data-panel="overview">Visão geral</button>
-      <button class="tab" type="button" data-panel="limpeza">Limpeza de lastro</button>
-      <button class="tab" type="button" data-panel="obras">Obras DR</button>
+      <button class="tab" type="button" data-panel="limpeza">Limpeza Geral</button>
+      <button class="tab" type="button" data-panel="obras">Obras</button>
       <button class="tab" type="button" data-panel="dados">Fonte de dados</button>
     </nav>
 
@@ -55,7 +55,7 @@
         <article class="surface-card">
           <div class="card-head">
             <div>
-              <span class="eyebrow">Limpeza de lastro</span>
+              <span class="eyebrow">Limpeza Geral</span>
               <h3>Evolução por SUB</h3>
             </div>
           </div>
@@ -66,7 +66,7 @@
           <div class="card-head">
             <div>
               <span class="eyebrow">Obras</span>
-              <h3>Status das obras DR</h3>
+              <h3>Status das Obras</h3>
             </div>
           </div>
           <div id="overviewObrasList" class="compact-list"></div>
@@ -77,9 +77,8 @@
     <section class="panel" id="panel-limpeza">
       <div class="section-heading">
         <div>
-          <span class="eyebrow">ZBV-ZAR PDM Limpeza DR</span>
-          <h2>Limpeza de lastro por SUB</h2>
-          <p>Cards gerados a partir da soma de EXT planejada e EXT REAL executada em cada SUB.</p>
+          <span class="eyebrow">ZBV-ZAR PDM Limpeza</span>
+          <h2>Limpeza Geral por SUB</h2>
         </div>
       </div>
 
@@ -92,7 +91,7 @@
         </label>
         <label class="grow">
           Buscar
-          <input type="search" id="limpezaSearch" placeholder="Buscar SB, equipamento ou atividade..." />
+          <input type="search" id="limpezaSearch" placeholder="Buscar equipamento ou atividade..." />
         </label>
       </div>
 
@@ -102,9 +101,8 @@
     <section class="panel" id="panel-obras">
       <div class="section-heading">
         <div>
-          <span class="eyebrow">ZBV-ZAR Obras DR</span>
+          <span class="eyebrow">ZBV-ZAR Obras</span>
           <h2>Dashboard de obras</h2>
-          <p>Cards com status, risco, prazo, localização e observações das obras cadastradas na planilha.</p>
         </div>
       </div>
 
@@ -157,12 +155,12 @@
 
         <div class="source-form">
           <label>
-            CSV — ZBV-ZAR PDM Limpeza DR
+            CSV — ZBV-ZAR PDM Limpeza
             <input id="limpezaCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/...output=csv" />
           </label>
 
           <label>
-            CSV — ZBV-ZAR Obras DR
+            CSV — ZBV-ZAR Obras
             <input id="obrasCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/...output=csv" />
           </label>
 
