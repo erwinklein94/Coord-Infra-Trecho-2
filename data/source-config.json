@@ -1,0 +1,5 @@
+{
+  "limpezaCsvUrl": "",
+  "obrasCsvUrl": "",
+  "observacao": "Quando a planilha PDM estiver online, publique as abas em CSV e cole as URLs aqui. Deixe vazio para usar os JSONs de exemplo."
+}

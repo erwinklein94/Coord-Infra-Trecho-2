@@ -1,888 +1,792 @@
-const STORAGE = {
-  reports: "trecho2_reports_v1",
-  works: "trecho2_works_override_v1",
-  theme: "trecho2_theme_v1"
+const DEFAULT_FILES = {
+  limpezaJson: "data/pdm-limpeza.json",
+  obrasJson: "data/obras-dr.json",
+  sourceConfig: "data/source-config.json",
+};
+
+const STORAGE_KEYS = {
+  theme: "trecho2-pdm-theme",
+  source: "trecho2-pdm-source-config",
 };
 
 const state = {
-  baseData: null,
-  worksData: null,
-  reportsToApply: [],
-  selectedPhotos: []
+  limpeza: { rows: [], subSummary: [], generatedAt: null, sourceSheet: "" },
+  obras: { rows: [], generatedAt: null, sourceSheet: "" },
+  sourceLabel: "Dados exemplo",
+  loadErrors: [],
 };
 
-const fallbackWorksData = {
-  versao: "1.0.0",
-  trecho: "Trecho 2",
-  area: "Infraestrutura ferroviária",
-  atualizadoEm: new Date().toISOString().slice(0, 10),
-  obras: [
-    {
-      id: "OBR-001",
-      nome: "Implantação de canaletas - KM 101+200 ao 101+900",
-      frente: "Drenagem",
-      tipo: "Canaleta / escoamento superficial",
-      kmInicio: "101+200",
-      kmFim: "101+900",
-      metaMetros: 700,
-      executadoMetros: 280,
-      responsavel: "Fiscal 1",
-      status: "Em andamento",
-      ultimaAtualizacao: new Date().toISOString().slice(0, 10),
-      observacoes: "Exemplo inicial. Edite em data/obras.json.",
-      apontamentosAplicados: []
-    },
-    {
-      id: "OBR-002",
-      nome: "Correção de talude - KM 108+500",
-      frente: "Terraplenagem",
-      tipo: "Talude / contenção",
-      kmInicio: "108+300",
-      kmFim: "108+700",
-      metaMetros: 400,
-      executadoMetros: 80,
-      responsavel: "Fiscal 2",
-      status: "Atenção",
-      ultimaAtualizacao: new Date().toISOString().slice(0, 10),
-      observacoes: "Acompanhar drenagem provisória.",
-      apontamentosAplicados: []
-    },
-    {
-      id: "OBR-003",
-      nome: "Recomposição de lastro e sublastro - KM 112+000 ao 112+600",
-      frente: "Plataforma",
-      tipo: "Lastro / sublastro",
-      kmInicio: "112+000",
-      kmFim: "112+600",
-      metaMetros: 600,
-      executadoMetros: 510,
-      responsavel: "Fiscal 3",
-      status: "Em andamento",
-      ultimaAtualizacao: new Date().toISOString().slice(0, 10),
-      observacoes: "Próximo de conclusão.",
-      apontamentosAplicados: []
+document.addEventListener("DOMContentLoaded", () => {
+  initTheme();
+  bindNavigation();
+  bindFilters();
+  bindSourceActions();
+  loadData();
+});
+
+function initTheme() {
+  const saved = localStorage.getItem(STORAGE_KEYS.theme);
+  const useDark = saved === "dark";
+  document.body.classList.toggle("dark", useDark);
+  updateThemeButton();
+
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const isDark = !document.body.classList.contains("dark");
+    document.body.classList.toggle("dark", isDark);
+    localStorage.setItem(STORAGE_KEYS.theme, isDark ? "dark" : "light");
+    updateThemeButton();
+  });
+}
+
+function updateThemeButton() {
+  const isDark = document.body.classList.contains("dark");
+  document.getElementById("themeToggleText").textContent = isDark ? "Tema claro" : "Tema escuro";
+}
+
+function bindNavigation() {
+  document.querySelectorAll(".tab").forEach((button) => {
+    button.addEventListener("click", () => {
+      const panel = button.dataset.panel;
+      document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab === button));
+      document.querySelectorAll(".panel").forEach((section) => {
+        section.classList.toggle("active", section.id === `panel-${panel}`);
+      });
+    });
+  });
+}
+
+function bindFilters() {
+  ["limpezaSubFilter", "limpezaSearch"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", renderLimpeza);
+  });
+
+  ["obrasSubFilter", "obrasStatusFilter", "obrasRiscoFilter", "obrasSearch"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", renderObras);
+  });
+}
+
+function bindSourceActions() {
+  document.getElementById("saveSourceBtn").addEventListener("click", () => {
+    const config = {
+      limpezaCsvUrl: document.getElementById("limpezaCsvUrl").value.trim(),
+      obrasCsvUrl: document.getElementById("obrasCsvUrl").value.trim(),
+    };
+    localStorage.setItem(STORAGE_KEYS.source, JSON.stringify(config));
+    showStatus("URLs salvas neste navegador. Recarregando os dashboards...");
+    loadData();
+  });
+
+  document.getElementById("reloadSourceBtn").addEventListener("click", () => {
+    showStatus("Recarregando dados...");
+    loadData();
+  });
+
+  document.getElementById("clearSourceBtn").addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEYS.source);
+    document.getElementById("limpezaCsvUrl").value = "";
+    document.getElementById("obrasCsvUrl").value = "";
+    showStatus("URLs locais removidas. O site voltará a usar o arquivo central ou os JSONs de exemplo.");
+    loadData();
+  });
+}
+
+async function loadData() {
+  state.loadErrors = [];
+  showStatus("Carregando base do PDM...");
+
+  const centralConfig = await readCentralSourceConfig();
+  const localConfig = readLocalSourceConfig();
+  const config = mergeConfigs(centralConfig, localConfig);
+
+  document.getElementById("limpezaCsvUrl").value = localConfig.limpezaCsvUrl || centralConfig.limpezaCsvUrl || "";
+  document.getElementById("obrasCsvUrl").value = localConfig.obrasCsvUrl || centralConfig.obrasCsvUrl || "";
+
+  try {
+    state.limpeza = await loadLimpeza(config);
+  } catch (error) {
+    state.loadErrors.push(`Limpeza de lastro: ${error.message}`);
+    state.limpeza = await fetchJson(DEFAULT_FILES.limpezaJson);
+  }
+
+  try {
+    state.obras = await loadObras(config);
+  } catch (error) {
+    state.loadErrors.push(`Obras DR: ${error.message}`);
+    state.obras = await fetchJson(DEFAULT_FILES.obrasJson);
+  }
+
+  const usingCsv = Boolean(config.limpezaCsvUrl || config.obrasCsvUrl);
+  state.sourceLabel = usingCsv ? "Planilha PDM online" : "Dados exemplo da planilha anexada";
+
+  fillFilterOptions();
+  renderAll();
+
+  if (state.loadErrors.length) {
+    showStatus(`Alguns dados online não foram carregados. Usando fallback local. ${state.loadErrors.join(" | ")}`);
+  } else {
+    hideStatus();
+  }
+}
+
+async function readCentralSourceConfig() {
+  try {
+    const response = await fetch(DEFAULT_FILES.sourceConfig, { cache: "no-store" });
+    if (!response.ok) return {};
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+
+function readLocalSourceConfig() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.source) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function mergeConfigs(central, local) {
+  return {
+    limpezaCsvUrl: nonEmpty(local.limpezaCsvUrl) || nonEmpty(central.limpezaCsvUrl) || "",
+    obrasCsvUrl: nonEmpty(local.obrasCsvUrl) || nonEmpty(central.obrasCsvUrl) || "",
+  };
+}
+
+function nonEmpty(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+async function loadLimpeza(config) {
+  if (config.limpezaCsvUrl) {
+    const text = await fetchText(config.limpezaCsvUrl);
+    const matrix = parseCsv(text);
+    const rows = normalizeLimpezaFromMatrix(matrix);
+    return {
+      title: "ZBV-ZAR PDM Limpeza DR",
+      sourceSheet: "ZBV-ZAR PDM Limpeza DR",
+      generatedAt: new Date().toISOString(),
+      rows,
+      subSummary: calculateSubSummary(rows),
+    };
+  }
+
+  const data = await fetchJson(DEFAULT_FILES.limpezaJson);
+  if (!Array.isArray(data.subSummary) || !data.subSummary.length) {
+    data.subSummary = calculateSubSummary(data.rows || []);
+  }
+  return data;
+}
+
+async function loadObras(config) {
+  if (config.obrasCsvUrl) {
+    const text = await fetchText(config.obrasCsvUrl);
+    const matrix = parseCsv(text);
+    const rows = normalizeObrasFromMatrix(matrix);
+    return {
+      title: "ZBV-ZAR Obras DR",
+      sourceSheet: "ZBV-ZAR Obras DR",
+      generatedAt: new Date().toISOString(),
+      rows,
+    };
+  }
+
+  return await fetchJson(DEFAULT_FILES.obrasJson);
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Não foi possível ler ${url}`);
+  return await response.json();
+}
+
+async function fetchText(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Não foi possível ler a URL CSV`);
+  return await response.text();
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      cell += '"';
+      i++;
+      continue;
     }
-  ]
-};
 
-const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+    if (char === "," && !inQuotes) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") i++;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  if (cell.length || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+
+  return rows;
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "-";
-  const [year, month, day] = dateString.split("-");
-  if (!year || !month || !day) return dateString;
-  return `${day}/${month}/${year}`;
+function normalizeHeader(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
 }
 
-function toNumber(value) {
-  const number = Number(String(value ?? "").replace(",", "."));
+function findHeaderRow(matrix, requiredTerms) {
+  return matrix.findIndex((row) => {
+    const normalized = row.map(normalizeHeader);
+    return requiredTerms.every((term) => normalized.includes(normalizeHeader(term)));
+  });
+}
+
+function headerMap(row) {
+  const map = {};
+  row.forEach((cell, index) => {
+    const key = normalizeHeader(cell);
+    if (key) map[key] = index;
+  });
+  return map;
+}
+
+function getByHeader(row, map, name) {
+  const index = map[normalizeHeader(name)];
+  return index === undefined ? "" : row[index];
+}
+
+function normalizeLimpezaFromMatrix(matrix) {
+  const headerIndex = findHeaderRow(matrix, ["EQUIP_INFRA", "EXT", "EXT REAL"]);
+  if (headerIndex < 0) throw new Error("Cabeçalho da aba de limpeza não encontrado.");
+
+  const map = headerMap(matrix[headerIndex]);
+  const rows = [];
+
+  matrix.slice(headerIndex + 1).forEach((row, index) => {
+    const equip = String(getByHeader(row, map, "EQUIP_INFRA") || "").trim();
+    if (!equip || !equip.includes("/")) return;
+
+    const ext = parseNumber(getByHeader(row, map, "EXT"));
+    const real = parseNumber(getByHeader(row, map, "EXT REAL"));
+    const sub = String(getByHeader(row, map, "SUB") || equip.split("/")[0] || "").trim();
+
+    rows.push({
+      excelRow: headerIndex + index + 2,
+      equipInfra: equip,
+      atividade: String(getByHeader(row, map, "ATV") || "").trim(),
+      kmi: parseInteger(getByHeader(row, map, "KMI")),
+      kmf: parseInteger(getByHeader(row, map, "KMF")),
+      kmiReal: parseInteger(getByHeader(row, map, "KMI REAL")),
+      kmfReal: parseInteger(getByHeader(row, map, "KMF REAL")),
+      ext,
+      extM: `${Math.round(ext)}m`,
+      extReal: real,
+      extRealM: `${Math.round(real)}m`,
+      percentualReal: ext ? real / ext : 0,
+      sb: cleanOptional(getByHeader(row, map, "SB")),
+      sub,
+      percentualSub: parseNumber(getByHeader(row, map, "%SUB")),
+    });
+  });
+
+  return rows;
+}
+
+function normalizeObrasFromMatrix(matrix) {
+  const headerIndex = findHeaderRow(matrix, ["SUB", "DESCRIÇÃO OBRA", "STATUS"]);
+  if (headerIndex < 0) throw new Error("Cabeçalho da aba de obras não encontrado.");
+
+  const map = headerMap(matrix[headerIndex]);
+  const rows = [];
+  let currentSub = "";
+
+  matrix.slice(headerIndex + 1).forEach((row, index) => {
+    const maybeSub = cleanOptional(getByHeader(row, map, "SUB"));
+    if (maybeSub) currentSub = maybeSub;
+
+    const descricao = cleanOptional(getByHeader(row, map, "DESCRIÇÃO OBRA"));
+    if (!descricao || descricao.toLowerCase().includes("plano de drenagem")) return;
+
+    const status = cleanOptional(getByHeader(row, map, "STATUS")) || "NÃO INFORMADO";
+    rows.push({
+      excelRow: headerIndex + index + 2,
+      sub: currentSub,
+      sb: cleanOptional(getByHeader(row, map, "SB")),
+      km: parseInteger(getByHeader(row, map, "KM")),
+      descricao,
+      tipoObra: cleanOptional(getByHeader(row, map, "TIPO DE OBRA")),
+      risco: cleanOptional(getByHeader(row, map, "RISCO")),
+      motivo: cleanOptional(getByHeader(row, map, "MOTIVO")),
+      equipamento: cleanOptional(getByHeader(row, map, "EQUIPAMENTO")),
+      extEq: parseNullableNumber(getByHeader(row, map, "EXT EQ.")),
+      extEqM: cleanOptional(getByHeader(row, map, "EXT EQ.(M)")),
+      prazoMes: parseNullableNumber(getByHeader(row, map, "PRAZO (MÊS)")),
+      dtInicio: cleanOptional(getByHeader(row, map, "DT INÍCIO")),
+      status,
+      progresso: statusToProgress(status),
+      obs: cleanOptional(getByHeader(row, map, "OBS.")),
+    });
+  });
+
+  return rows;
+}
+
+function cleanOptional(value) {
+  const text = String(value ?? "").trim();
+  return text && text !== "-" ? text : "";
+}
+
+function parseNumber(value) {
+  if (typeof value === "number") return value;
+  const text = String(value ?? "")
+    .replace(/\s/g, "")
+    .replace(/m/gi, "")
+    .replace("%", "");
+  if (!text || text === "-") return 0;
+  const normalized = text.includes(",") && !text.includes(".")
+    ? text.replace(/\./g, "").replace(",", ".")
+    : text.replace(",", ".");
+  const number = Number(normalized);
   return Number.isFinite(number) ? number : 0;
 }
 
-function formatMeters(value) {
-  return `${toNumber(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m`;
+function parseNullableNumber(value) {
+  if (value === null || value === undefined || String(value).trim() === "" || String(value).trim() === "-") return null;
+  return parseNumber(value);
 }
 
-function percent(done, goal) {
-  if (!goal || goal <= 0) return 0;
-  return Math.min(100, Math.round((done / goal) * 100));
+function parseInteger(value) {
+  const number = parseNullableNumber(value);
+  return number === null ? null : Math.round(number);
 }
 
-function safeId() {
-  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-  return `rel-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function statusToProgress(status) {
+  const normalized = normalizeHeader(status);
+  if (normalized.includes("CONCLUI")) return 1;
+  if (normalized.includes("ANDAMENTO")) return 0.5;
+  return 0;
 }
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+function calculateSubSummary(rows) {
+  const groups = new Map();
 
-function showToast(message) {
-  const toast = $("#toast");
-  toast.textContent = message;
-  toast.classList.add("show");
-  window.setTimeout(() => toast.classList.remove("show"), 3400);
-}
-
-function setupTheme() {
-  const savedTheme = localStorage.getItem(STORAGE.theme) || "light";
-  applyTheme(savedTheme);
-
-  const button = $("#themeToggle");
-  button?.addEventListener("click", () => {
-    const nextTheme = document.body.classList.contains("dark-theme") ? "light" : "dark";
-    applyTheme(nextTheme);
-    localStorage.setItem(STORAGE.theme, nextTheme);
-  });
-}
-
-function applyTheme(theme) {
-  const isDark = theme === "dark";
-  document.body.classList.toggle("dark-theme", isDark);
-
-  const button = $("#themeToggle");
-  if (!button) return;
-  button.textContent = isDark ? "☀" : "☾";
-  button.title = isDark ? "Usar tema claro" : "Usar tema escuro";
-  button.setAttribute("aria-label", button.title);
-  button.setAttribute("aria-pressed", String(isDark));
-}
-
-async function init() {
-  setupTheme();
-  setupNavigation();
-  setupReportForm();
-  setupHistoryExports();
-  setupCoordinatorTools();
-  setupDashboardFilters();
-
-  $("#reportDate").value = todayIso();
-  $("#periodStart").value = todayIso();
-  $("#periodEnd").value = todayIso();
-
-  await loadWorksData();
-  renderAll();
-  addActivityRow("08:00", "Início das atividades / deslocamento para frente de serviço");
-}
-
-function setupNavigation() {
-  $$('[data-target]').forEach(button => {
-    button.addEventListener("click", () => openTab(button.dataset.target));
+  rows.forEach((row) => {
+    const sub = String(row.sub || "").trim() || "Sem SUB";
+    if (!groups.has(sub)) groups.set(sub, []);
+    groups.get(sub).push(row);
   });
 
-  window.addEventListener("hashchange", () => {
-    const target = location.hash.replace("#", "");
-    if (target) openTab(target, false);
-  });
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([sub, items]) => {
+      const planejadoM = sum(items, "ext");
+      const realizadoM = sum(items, "extReal");
+      const atividades = {};
 
-  const initialTab = location.hash.replace("#", "");
-  if (initialTab) openTab(initialTab, false);
-}
+      items.forEach((item) => {
+        const key = item.atividade || "Sem ATV";
+        atividades[key] = (atividades[key] || 0) + 1;
+      });
 
-function openTab(target, updateHash = true) {
-  if (!$("#" + target)) return;
-  $$(".tab-panel").forEach(panel => panel.classList.toggle("active", panel.id === target));
-  $$(".tab-button").forEach(button => button.classList.toggle("active", button.dataset.target === target));
-  if (updateHash) history.replaceState(null, "", `#${target}`);
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-async function loadWorksData() {
-  try {
-    const response = await fetch("data/obras.json", { cache: "no-store" });
-    if (!response.ok) throw new Error("Arquivo data/obras.json não encontrado");
-    state.baseData = await response.json();
-  } catch (error) {
-    console.warn(error);
-    state.baseData = clone(fallbackWorksData);
-  }
-
-  const localOverride = localStorage.getItem(STORAGE.works);
-  if (localOverride) {
-    try {
-      state.worksData = JSON.parse(localOverride);
-      return;
-    } catch (error) {
-      console.warn("Base local inválida. Voltando ao arquivo do repositório.", error);
-      localStorage.removeItem(STORAGE.works);
-    }
-  }
-  state.worksData = clone(state.baseData);
-}
-
-function saveWorksLocal() {
-  state.worksData.atualizadoEm = todayIso();
-  localStorage.setItem(STORAGE.works, JSON.stringify(state.worksData));
-}
-
-function getWorks() {
-  return state.worksData?.obras ?? [];
-}
-
-function getReports() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE.reports) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveReports(reports) {
-  localStorage.setItem(STORAGE.reports, JSON.stringify(reports));
+      return {
+        sub,
+        planejadoM,
+        realizadoM,
+        saldoM: Math.max(planejadoM - realizadoM, 0),
+        percentual: planejadoM ? realizadoM / planejadoM : 0,
+        quantidadeFrentes: items.length,
+        frentesConcluidas: items.filter((item) => item.ext > 0 && item.extReal >= item.ext).length,
+        frentesAndamento: items.filter((item) => item.extReal > 0 && item.extReal < item.ext).length,
+        frentesPendentes: items.filter((item) => !item.extReal).length,
+        kmInicial: min(items.map((item) => item.kmi).filter(Number.isFinite)),
+        kmFinal: max(items.map((item) => item.kmf).filter(Number.isFinite)),
+        sbs: unique(items.map((item) => item.sb).filter(Boolean)),
+        atividades,
+      };
+    });
 }
 
 function renderAll() {
-  renderDashboard();
-  renderWorkOptions();
-  renderHistory();
+  renderHeaderMeta();
+  renderOverview();
+  renderLimpeza();
+  renderObras();
 }
 
-function setupDashboardFilters() {
-  $("#dashboardSearch").addEventListener("input", renderDashboard);
-  $("#statusFilter").addEventListener("change", renderDashboard);
+function renderHeaderMeta() {
+  document.getElementById("sourceLabel").textContent = state.sourceLabel;
+  document.getElementById("lastUpdateLabel").textContent = latestDateLabel([
+    state.limpeza.generatedAt,
+    state.obras.generatedAt,
+  ]);
 }
 
-function renderDashboard() {
-  const works = getFilteredWorks();
-  renderKpis(works);
+function renderOverview() {
+  const limpezaRows = state.limpeza.rows || [];
+  const obraRows = state.obras.rows || [];
+  const planejado = sum(limpezaRows, "ext");
+  const realizado = sum(limpezaRows, "extReal");
+  const pct = planejado ? realizado / planejado : 0;
+  const obrasConcluidas = obraRows.filter((row) => statusToProgress(row.status) === 1).length;
+  const obrasAndamento = obraRows.filter((row) => statusToProgress(row.status) > 0 && statusToProgress(row.status) < 1).length;
 
-  const container = $("#obraCards");
-  if (!works.length) {
-    container.innerHTML = `<div class="empty-state">Nenhuma obra encontrada para o filtro selecionado.</div>`;
+  document.getElementById("overviewKpis").innerHTML = [
+    kpiCard("Limpeza planejada", formatMeters(planejado), `${limpezaRows.length} frentes cadastradas`),
+    kpiCard("Limpeza executada", formatMeters(realizado), `${formatPercent(pct)} do planejado`),
+    kpiCard("Saldo de limpeza", formatMeters(Math.max(planejado - realizado, 0)), "metros restantes"),
+    kpiCard("Obras DR", String(obraRows.length), `${obrasAndamento} em andamento • ${obrasConcluidas} concluída(s)`),
+  ].join("");
+
+  document.getElementById("overviewSubList").innerHTML = (state.limpeza.subSummary || [])
+    .map((sub) => compactProgressRow(`SUB ${escapeHtml(sub.sub)}`, formatPercent(sub.percentual), sub.percentual))
+    .join("");
+
+  const statusCounts = countBy(obraRows, (row) => row.status || "NÃO INFORMADO");
+  document.getElementById("overviewObrasList").innerHTML = Object.entries(statusCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([status, count]) => compactProgressRow(escapeHtml(status), `${count} obra(s)`, count / Math.max(obraRows.length, 1)))
+    .join("");
+}
+
+function kpiCard(label, value, detail) {
+  return `
+    <article class="kpi-card">
+      <span class="kpi-label">${escapeHtml(label)}</span>
+      <strong class="kpi-value">${escapeHtml(value)}</strong>
+      <span class="kpi-detail">${escapeHtml(detail)}</span>
+    </article>
+  `;
+}
+
+function compactProgressRow(label, value, pct) {
+  return `
+    <div class="compact-row">
+      <strong>${label}</strong>
+      <div class="progress" aria-label="${stripHtml(label)} ${stripHtml(value)}">
+        <span style="width: ${clampPercent(pct)}%"></span>
+      </div>
+      <strong>${value}</strong>
+    </div>
+  `;
+}
+
+function renderLimpeza() {
+  const selectedSub = document.getElementById("limpezaSubFilter").value;
+  const search = normalizeHeader(document.getElementById("limpezaSearch").value);
+
+  let summaries = state.limpeza.subSummary || [];
+  if (selectedSub) summaries = summaries.filter((item) => String(item.sub) === selectedSub);
+
+  if (search) {
+    summaries = summaries.filter((summary) => {
+      const rows = limpezaRowsForSub(summary.sub);
+      const haystack = normalizeHeader([
+        summary.sub,
+        summary.sbs?.join(" "),
+        rows.map((row) => `${row.equipInfra} ${row.atividade} ${row.sb}`).join(" "),
+      ].join(" "));
+      return haystack.includes(search);
+    });
+  }
+
+  const container = document.getElementById("limpezaCards");
+  if (!summaries.length) {
+    container.innerHTML = `<div class="empty-state">Nenhuma SUB encontrada com os filtros atuais.</div>`;
     return;
   }
 
-  container.innerHTML = works.map(work => {
-    const done = toNumber(work.executadoMetros);
-    const goal = toNumber(work.metaMetros);
-    const pct = percent(done, goal);
-    const remaining = Math.max(goal - done, 0);
-    const statusClass = (work.status || "Planejada").replaceAll(" ", "-");
+  container.innerHTML = summaries.map((summary) => {
+    const rows = limpezaRowsForSub(summary.sub);
+    const activityBadges = Object.entries(summary.atividades || {})
+      .map(([name, count]) => `<span class="badge">${escapeHtml(name)}: ${count}</span>`)
+      .join("");
+
+    const sbBadges = (summary.sbs || [])
+      .map((sb) => `<span class="badge green">${escapeHtml(sb)}</span>`)
+      .join("");
+
+    const tableRows = rows.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.equipInfra)}</td>
+        <td>${escapeHtml(row.atividade)}</td>
+        <td>${formatKmRange(row.kmi, row.kmf)}</td>
+        <td>${formatMeters(row.ext)}</td>
+        <td>${formatMeters(row.extReal)}</td>
+        <td>${formatPercent(row.percentualReal)}</td>
+      </tr>
+    `).join("");
 
     return `
-      <article class="work-card status-${statusClass}">
-        <div class="work-top">
+      <article class="sub-card">
+        <div class="sub-top">
           <div>
-            <div class="work-id">${escapeHtml(work.id || "Sem ID")}</div>
-            <h3>${escapeHtml(work.nome || "Obra sem nome")}</h3>
+            <span class="eyebrow">Limpeza de lastro</span>
+            <div class="sub-title">SUB ${escapeHtml(summary.sub)}</div>
           </div>
-          <span class="status-badge ${escapeHtml(work.status || "Planejada")}">${escapeHtml(work.status || "Planejada")}</span>
+          <div class="sub-percent">${formatPercent(summary.percentual)}</div>
         </div>
 
-        <div class="progress-wrap" aria-label="Progresso da obra">
-          <div class="progress-meta">
-            <span>${pct}% concluído</span>
-            <span>${formatMeters(done)} / ${formatMeters(goal)}</span>
-          </div>
-          <div class="progress-bar"><span class="progress-fill" style="width:${pct}%"></span></div>
+        <div class="progress">
+          <span style="width: ${clampPercent(summary.percentual)}%"></span>
         </div>
 
-        <dl class="work-details">
-          <div><dt>Frente</dt><dd>${escapeHtml(work.frente || "-")}</dd></div>
-          <div><dt>Serviço</dt><dd>${escapeHtml(work.tipo || "-")}</dd></div>
-          <div><dt>KM</dt><dd>${escapeHtml(work.kmInicio || "-")} → ${escapeHtml(work.kmFim || "-")}</dd></div>
-          <div><dt>Saldo</dt><dd>${formatMeters(remaining)}</dd></div>
-          <div><dt>Fiscal</dt><dd>${escapeHtml(work.responsavel || "-")}</dd></div>
-          <div><dt>Atualização</dt><dd>${formatDate(work.ultimaAtualizacao)}</dd></div>
-        </dl>
+        <div class="metric-row">
+          <div class="metric-pill"><span>Planejado</span><strong>${formatMeters(summary.planejadoM)}</strong></div>
+          <div class="metric-pill"><span>Executado</span><strong>${formatMeters(summary.realizadoM)}</strong></div>
+          <div class="metric-pill"><span>Saldo</span><strong>${formatMeters(summary.saldoM)}</strong></div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item"><span>Faixa KM</span><strong>${formatKmRange(summary.kmInicial, summary.kmFinal)}</strong></div>
+          <div class="meta-item"><span>Frentes</span><strong>${summary.quantidadeFrentes}</strong></div>
+          <div class="meta-item"><span>Concluídas</span><strong>${summary.frentesConcluidas}</strong></div>
+          <div class="meta-item"><span>Em andamento</span><strong>${summary.frentesAndamento}</strong></div>
+          <div class="meta-item"><span>Pendentes</span><strong>${summary.frentesPendentes}</strong></div>
+        </div>
+
+        <div class="tag-row">${sbBadges || `<span class="badge">Sem SB informado</span>`}</div>
+        <div class="tag-row" style="margin-top: 8px;">${activityBadges}</div>
+
+        <details>
+          <summary>Ver frentes da SUB ${escapeHtml(summary.sub)}</summary>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Equip. infra</th>
+                  <th>ATV</th>
+                  <th>KM</th>
+                  <th>EXT</th>
+                  <th>EXT real</th>
+                  <th>% real</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+        </details>
       </article>
     `;
   }).join("");
 }
 
-function getFilteredWorks() {
-  const term = $("#dashboardSearch").value.trim().toLowerCase();
-  const status = $("#statusFilter").value;
+function renderObras() {
+  const selectedSub = document.getElementById("obrasSubFilter").value;
+  const selectedStatus = document.getElementById("obrasStatusFilter").value;
+  const selectedRisco = document.getElementById("obrasRiscoFilter").value;
+  const search = normalizeHeader(document.getElementById("obrasSearch").value);
 
-  return getWorks().filter(work => {
-    const matchesStatus = status === "todos" || work.status === status;
-    const searchable = [work.id, work.nome, work.frente, work.tipo, work.kmInicio, work.kmFim, work.responsavel]
-      .join(" ")
-      .toLowerCase();
-    return matchesStatus && (!term || searchable.includes(term));
-  });
-}
+  let rows = state.obras.rows || [];
+  if (selectedSub) rows = rows.filter((row) => String(row.sub) === selectedSub);
+  if (selectedStatus) rows = rows.filter((row) => String(row.status) === selectedStatus);
+  if (selectedRisco) rows = rows.filter((row) => String(row.risco) === selectedRisco);
 
-function renderKpis(works) {
-  const totalGoal = works.reduce((sum, work) => sum + toNumber(work.metaMetros), 0);
-  const totalDone = works.reduce((sum, work) => sum + toNumber(work.executadoMetros), 0);
-  const pct = percent(totalDone, totalGoal);
-  const concluded = works.filter(work => percent(work.executadoMetros, work.metaMetros) >= 100 || work.status === "Concluída").length;
-
-  const kpis = [
-    ["Obras no filtro", works.length],
-    ["Execução geral", `${pct}%`],
-    ["Meta PDM", formatMeters(totalGoal)],
-    ["Concluídas", concluded]
-  ];
-
-  $("#kpiGrid").innerHTML = kpis.map(([label, value]) => `
-    <article class="kpi-card">
-      <span>${label}</span>
-      <strong>${value}</strong>
-    </article>
-  `).join("");
-}
-
-function renderWorkOptions() {
-  const options = getWorks().map(work => `<option value="${escapeHtml(work.id)}">${escapeHtml(work.id)} • ${escapeHtml(work.nome)}</option>`).join("");
-  $("#obraSelect").innerHTML = `<option value="">Selecione uma obra</option>${options}`;
-  $("#obraSelect").addEventListener("change", fillWorkFields);
-}
-
-function fillWorkFields() {
-  const selected = getWorks().find(work => work.id === $("#obraSelect").value);
-  if (!selected) return;
-  $("#serviceType").value = selected.tipo || selected.frente || "";
-  $("#kmStart").value = selected.kmInicio || "";
-  $("#kmEnd").value = selected.kmFim || "";
-  $("#plannedMeters").value = selected.metaMetros || "";
-}
-
-function setupReportForm() {
-  setupResourceChecklist();
-  $("#addActivityBtn").addEventListener("click", () => addActivityRow());
-  $("#photoInput").addEventListener("change", handlePhotos);
-  $("#clearFormBtn").addEventListener("click", clearReportForm);
-  $("#reportForm").addEventListener("submit", saveReportFromForm);
-}
-
-function addActivityRow(time = "", description = "") {
-  const template = $("#activityTemplate");
-  const item = template.content.firstElementChild.cloneNode(true);
-  $(".activity-time", item).value = time;
-  $(".activity-description", item).value = description;
-  $(".remove-activity", item).addEventListener("click", () => item.remove());
-  $("#activityList").appendChild(item);
-}
-
-function setupResourceChecklist() {
-  $$("#resourceChecklist .checklist-item").forEach(item => {
-    const checkbox = $(".resource-present", item);
-    const quantityInput = $(".resource-qty", item);
-
-    quantityInput.addEventListener("input", () => {
-      if (toNumber(quantityInput.value) > 0) checkbox.checked = true;
-    });
-
-    checkbox.addEventListener("change", () => {
-      if (!checkbox.checked) quantityInput.value = "0";
-      if (checkbox.checked && toNumber(quantityInput.value) === 0) quantityInput.value = "1";
-    });
-  });
-}
-
-function collectResourceChecklist() {
-  return $$("#resourceChecklist .checklist-item").map(item => {
-    const name = $("span", item).textContent.trim();
-    const present = $(".resource-present", item).checked;
-    const quantity = present ? Math.max(0, Math.round(toNumber($(".resource-qty", item).value))) : 0;
-    return { nome: name, quantidade: quantity, presente: present && quantity > 0 };
-  });
-}
-
-function resourceChecklistToText(resources = []) {
-  if (!resources.length) return "Não informado.";
-  return resources
-    .map(resource => `* ${toNumber(resource.quantidade)} ${resource.nome}.`)
-    .join("\n");
-}
-
-function resourceChecklistToHtml(resources = []) {
-  if (!resources.length) return "<li>Não informado.</li>";
-  return resources
-    .map(resource => `<li><strong>${toNumber(resource.quantidade)}</strong> ${escapeHtml(resource.nome)}.</li>`)
-    .join("");
-}
-
-function resourceChecklistInline(resources = []) {
-  if (!resources.length) return "Checklist não informado.";
-  const active = resources.filter(resource => toNumber(resource.quantidade) > 0);
-  if (!active.length) return "Sem equipe/equipamentos marcados.";
-  return active.map(resource => `${toNumber(resource.quantidade)} ${resource.nome}`).join(" • ");
-}
-
-async function handlePhotos(event) {
-  const files = Array.from(event.target.files || []);
-  if (!files.length) return;
-
-  try {
-    const compressed = [];
-    for (const file of files) {
-      compressed.push(await compressImage(file));
-    }
-    state.selectedPhotos.push(...compressed);
-    renderPhotoPreview();
-    showToast(`${files.length} foto(s) adicionada(s) ao relatório.`);
-  } catch (error) {
-    console.error(error);
-    showToast("Não foi possível processar uma das fotos.");
-  } finally {
-    event.target.value = "";
+  if (search) {
+    rows = rows.filter((row) => normalizeHeader([
+      row.sub,
+      row.sb,
+      row.km,
+      row.descricao,
+      row.tipoObra,
+      row.risco,
+      row.motivo,
+      row.equipamento,
+      row.status,
+      row.obs,
+    ].join(" ")).includes(search));
   }
-}
 
-function compressImage(file, maxSize = 1200, quality = 0.74) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = () => {
-      const image = new Image();
-      image.onerror = reject;
-      image.onload = () => {
-        const scale = Math.min(maxSize / image.width, maxSize / image.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(image.width * scale);
-        canvas.height = Math.round(image.height * scale);
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve({
-          name: file.name,
-          type: "image/jpeg",
-          dataUrl: canvas.toDataURL("image/jpeg", quality)
-        });
-      };
-      image.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-function renderPhotoPreview() {
-  const container = $("#photoPreview");
-  container.innerHTML = state.selectedPhotos.map((photo, index) => `
-    <div class="photo-chip">
-      <img src="${photo.dataUrl}" alt="Foto ${index + 1} do relatório" />
-      <button type="button" class="tiny-button delete" data-remove-photo="${index}">Remover</button>
-    </div>
-  `).join("");
-
-  $$('[data-remove-photo]').forEach(button => {
-    button.addEventListener("click", () => {
-      state.selectedPhotos.splice(Number(button.dataset.removePhoto), 1);
-      renderPhotoPreview();
-    });
-  });
-}
-
-function saveReportFromForm(event) {
-  event.preventDefault();
-
-  const selectedWork = getWorks().find(work => work.id === $("#obraSelect").value);
-  const activities = $$("#activityList .activity-item")
-    .map(item => ({
-      hora: $(".activity-time", item).value,
-      descricao: $(".activity-description", item).value.trim()
-    }))
-    .filter(activity => activity.hora || activity.descricao);
-
-  const report = {
-    id: safeId(),
-    trecho: "Trecho 2",
-    area: "Infraestrutura ferroviária",
-    fiscal: $("#fiscalName").value.trim(),
-    data: $("#reportDate").value,
-    turno: $("#shift").value,
-    clima: $("#weather").value,
-    base: $("#baseLocation").value.trim(),
-    obraId: $("#obraSelect").value,
-    obraNome: selectedWork?.nome || "",
-    tipoServico: $("#serviceType").value.trim(),
-    encarregado: $("#crewLeader").value.trim(),
-    atividadePrincipal: $("#mainActivity").value.trim(),
-    equipeRecursos: collectResourceChecklist(),
-    kmInicio: $("#kmStart").value.trim(),
-    kmFim: $("#kmEnd").value.trim(),
-    metaPdmMetros: toNumber($("#plannedMeters").value),
-    metrosExecutadosDia: toNumber($("#executedMeters").value),
-    atividades: activities,
-    condicoesExecucao: $("#qualityNotes").value.trim(),
-    segurancaInterferencias: $("#safetyNotes").value.trim(),
-    naoConformidades: $("#nonConformities").value.trim(),
-    fotos: clone(state.selectedPhotos),
-    criadoEm: new Date().toISOString()
-  };
-
-  if (!report.fiscal || !report.data || !report.obraId) {
-    showToast("Preencha fiscal, data e obra antes de salvar.");
+  const container = document.getElementById("obrasCards");
+  if (!rows.length) {
+    container.innerHTML = `<div class="empty-state">Nenhuma obra encontrada com os filtros atuais.</div>`;
     return;
   }
 
-  const reports = getReports();
-  reports.unshift(report);
-  saveReports(reports);
-  clearReportForm(false);
-  renderHistory();
-  showToast("Relatório salvo no histórico deste navegador.");
-  openTab("historico");
-}
-
-function clearReportForm(confirmClear = true) {
-  if (confirmClear && !window.confirm("Limpar o formulário atual?")) return;
-  $("#reportForm").reset();
-  $("#reportDate").value = todayIso();
-  $("#activityList").innerHTML = "";
-  state.selectedPhotos = [];
-  renderPhotoPreview();
-  addActivityRow("08:00", "Início das atividades / deslocamento para frente de serviço");
-}
-
-function setupHistoryExports() {
-  $("#periodStart").addEventListener("change", renderHistory);
-  $("#periodEnd").addEventListener("change", renderHistory);
-  $("#exportJsonBtn").addEventListener("click", exportSelectedReportsJson);
-  $("#exportPdfBtn").addEventListener("click", printSelectedReports);
-  $("#exportWhatsBtn").addEventListener("click", exportSelectedReportsWhatsapp);
-}
-
-function getSelectedReports() {
-  const start = $("#periodStart").value;
-  const end = $("#periodEnd").value;
-  return getReports().filter(report => {
-    const afterStart = !start || report.data >= start;
-    const beforeEnd = !end || report.data <= end;
-    return afterStart && beforeEnd;
-  });
-}
-
-function renderHistory() {
-  const reports = getSelectedReports();
-  const container = $("#historyList");
-
-  if (!reports.length) {
-    container.innerHTML = `<div class="empty-state">Nenhum relatório salvo no período selecionado.</div>`;
-    return;
-  }
-
-  container.innerHTML = reports.map(report => `
-    <article class="history-card">
-      <div class="history-card-header">
-        <div>
-          <h3>${escapeHtml(report.obraId)} • ${escapeHtml(report.obraNome || "Obra")}</h3>
-          <div class="history-meta">
-            ${formatDate(report.data)} • ${escapeHtml(report.fiscal)} • ${escapeHtml(report.turno || "-")}<br>
-            Serviço: ${escapeHtml(report.tipoServico || "-")} • KM ${escapeHtml(report.kmInicio || "-")} → ${escapeHtml(report.kmFim || "-")} • Executado: ${formatMeters(report.metrosExecutadosDia)}
+  container.innerHTML = rows.map((row) => {
+    const progress = row.progresso ?? statusToProgress(row.status);
+    return `
+      <article class="obra-card">
+        <div class="obra-top">
+          <div>
+            <span class="eyebrow">SUB ${escapeHtml(row.sub || "—")}</span>
+            <div class="obra-title">${escapeHtml(row.descricao)}</div>
           </div>
         </div>
-        <div class="history-actions">
-          <button class="tiny-button" data-one-whatsapp="${report.id}">WhatsApp</button>
-          <button class="tiny-button" data-one-print="${report.id}">PDF</button>
-          <button class="tiny-button delete" data-delete-report="${report.id}">Excluir</button>
+
+        <div class="badge-row">
+          <span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status || "NÃO INFORMADO")}</span>
+          <span class="risk-badge ${riskClass(row.risco)}">Risco: ${escapeHtml(row.risco || "—")}</span>
         </div>
-      </div>
-      <div class="history-checklist">
-        <strong>Encarregado:</strong> ${escapeHtml(report.encarregado || "-")}<br>
-        <strong>Atividade:</strong> ${escapeHtml(report.atividadePrincipal || "-")}<br>
-        <strong>Equipe/equipamentos:</strong> ${escapeHtml(resourceChecklistInline(report.equipeRecursos || []))}
-      </div>
-      <p>${escapeHtml(report.condicoesExecucao || report.naoConformidades || "Sem observações adicionais.")}</p>
-      ${report.fotos?.length ? `<div class="photo-preview">${report.fotos.map((photo, index) => `<img src="${photo.dataUrl}" alt="Foto ${index + 1} do relatório" />`).join("")}</div>` : ""}
-    </article>
-  `).join("");
 
-  $$('[data-delete-report]').forEach(button => {
-    button.addEventListener("click", () => deleteReport(button.dataset.deleteReport));
-  });
-  $$('[data-one-whatsapp]').forEach(button => {
-    button.addEventListener("click", () => {
-      const report = getReports().find(item => item.id === button.dataset.oneWhatsapp);
-      openWhatsapp([report]);
-    });
-  });
-  $$('[data-one-print]').forEach(button => {
-    button.addEventListener("click", () => {
-      const report = getReports().find(item => item.id === button.dataset.onePrint);
-      printReports([report]);
-    });
-  });
+        <div class="progress" style="margin-top: 14px;">
+          <span style="width: ${clampPercent(progress)}%"></span>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item"><span>SB</span><strong>${escapeHtml(row.sb || "—")}</strong></div>
+          <div class="meta-item"><span>KM</span><strong>${formatKm(row.km)}</strong></div>
+          <div class="meta-item"><span>Tipo</span><strong>${escapeHtml(row.tipoObra || "—")}</strong></div>
+          <div class="meta-item"><span>Equipamento</span><strong>${escapeHtml(row.equipamento || "—")}</strong></div>
+          <div class="meta-item"><span>Extensão</span><strong>${escapeHtml(row.extEqM || formatMeters(row.extEq || 0))}</strong></div>
+          <div class="meta-item"><span>Prazo</span><strong>${formatPrazo(row.prazoMes)}</strong></div>
+        </div>
+
+        <p><strong>Motivo:</strong> ${escapeHtml(row.motivo || "—")}</p>
+        ${row.obs ? `<p><strong>Observação:</strong> ${escapeHtml(row.obs)}</p>` : ""}
+      </article>
+    `;
+  }).join("");
 }
 
-function deleteReport(id) {
-  if (!window.confirm("Excluir este relatório do histórico local?")) return;
-  saveReports(getReports().filter(report => report.id !== id));
-  renderHistory();
-  showToast("Relatório excluído do histórico local.");
+function fillFilterOptions() {
+  fillSelect("limpezaSubFilter", unique((state.limpeza.subSummary || []).map((row) => String(row.sub))).sort(sortNumericText), "Todas");
+  fillSelect("obrasSubFilter", unique((state.obras.rows || []).map((row) => String(row.sub || "")).filter(Boolean)).sort(sortNumericText), "Todas");
+  fillSelect("obrasStatusFilter", unique((state.obras.rows || []).map((row) => row.status || "NÃO INFORMADO")).sort(), "Todos");
+  fillSelect("obrasRiscoFilter", unique((state.obras.rows || []).map((row) => row.risco || "Não informado")).sort(), "Todos");
 }
 
-function exportSelectedReportsJson() {
-  const reports = getSelectedReports();
-  if (!reports.length) return showToast("Não há relatórios no período selecionado.");
-
-  const payload = {
-    sistema: "Controle Trecho 2 - Infraestrutura",
-    tipo: "relatorios-fiscais",
-    geradoEm: new Date().toISOString(),
-    periodo: {
-      inicio: $("#periodStart").value || null,
-      fim: $("#periodEnd").value || null
-    },
-    relatorios: reports
-  };
-
-  downloadJson(payload, `relatorios-trecho2-${payload.periodo.inicio || "inicio"}-${payload.periodo.fim || "fim"}.json`);
-  showToast("JSON gerado. Este é o melhor formato para alimentar o dashboard.");
+function fillSelect(id, options, firstLabel) {
+  const select = document.getElementById(id);
+  const current = select.value;
+  select.innerHTML = `<option value="">${escapeHtml(firstLabel)}</option>` +
+    options.map((option) => `<option value="${escapeAttribute(option)}">${escapeHtml(option)}</option>`).join("");
+  if (options.includes(current)) select.value = current;
 }
 
-function printSelectedReports() {
-  const reports = getSelectedReports();
-  if (!reports.length) return showToast("Não há relatórios no período selecionado.");
-  printReports(reports);
+function limpezaRowsForSub(sub) {
+  return (state.limpeza.rows || []).filter((row) => String(row.sub) === String(sub));
 }
 
-function exportSelectedReportsWhatsapp() {
-  const reports = getSelectedReports();
-  if (!reports.length) return showToast("Não há relatórios no período selecionado.");
-  openWhatsapp(reports);
+function sum(rows, key) {
+  return rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
 }
 
-function reportToText(report) {
-  const activities = (report.atividades || [])
-    .map(activity => `• ${activity.hora || "--:--"} - ${activity.descricao || "Atividade sem descrição"}`)
-    .join("\n");
-
-  return `*Relatório diário - Trecho 2 / Infraestrutura*\n\n` +
-    `*Data:* ${formatDate(report.data)}\n` +
-    `*Fiscal:* ${report.fiscal || "-"}\n` +
-    `*Turno:* ${report.turno || "-"}\n` +
-    `*Clima:* ${report.clima || "-"}\n` +
-    `*Obra:* ${report.obraId || "-"} - ${report.obraNome || "-"}\n` +
-    `*Serviço:* ${report.tipoServico || "-"}\n` +
-    `*Encarregado:* ${report.encarregado || "-"}\n` +
-    `*Atividade:* ${report.atividadePrincipal || "-"}\n\n` +
-    `*Equipe/equipamentos:*\n${resourceChecklistToText(report.equipeRecursos || [])}\n\n` +
-    `*KM:* ${report.kmInicio || "-"} → ${report.kmFim || "-"}\n` +
-    `*Meta PDM:* ${formatMeters(report.metaPdmMetros)}\n` +
-    `*Executado no dia:* ${formatMeters(report.metrosExecutadosDia)}\n\n` +
-    `*Atividades:*\n${activities || "Sem atividades por horário."}\n\n` +
-    `*Condições:* ${report.condicoesExecucao || "-"}\n` +
-    `*Segurança/interferências:* ${report.segurancaInterferencias || "-"}\n` +
-    `*Não conformidades:* ${report.naoConformidades || "-"}\n` +
-    `*Fotos anexadas no histórico local:* ${(report.fotos || []).length}`;
+function min(values) {
+  return values.length ? Math.min(...values) : null;
 }
 
-function openWhatsapp(reports) {
-  const text = reports.map(reportToText).join("\n\n----------------------\n\n");
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+function max(values) {
+  return values.length ? Math.max(...values) : null;
 }
 
-function printReports(reports) {
-  const html = `
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Relatórios Trecho 2</title>
-        <style>
-          :root { --blue-dark:#003d68; --blue:#00a6d6; --green:#07d85f; --yellow:#f6d400; --line:#d9e4ea; }
-          body { font-family: Arial, sans-serif; margin: 28px; color: #10212d; }
-          header { border-bottom: 6px solid var(--yellow); padding-bottom: 14px; margin-bottom: 24px; }
-          h1 { color: var(--blue-dark); margin: 0; font-size: 28px; }
-          h2 { color: var(--blue-dark); margin-bottom: 6px; }
-          .report { page-break-inside: avoid; border: 1px solid var(--line); border-left: 8px solid var(--blue); padding: 18px; margin-bottom: 18px; }
-          .meta { color: #596a76; line-height: 1.5; }
-          .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 18px; margin: 14px 0; }
-          .label { font-weight: bold; color: var(--blue-dark); }
-          ul { padding-left: 18px; }
-          .checklist { background: #f4f8fa; border: 1px solid var(--line); padding: 12px; margin: 14px 0; }
-          .checklist p { margin: 0 0 8px; }
-          .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
-          .photos img { width: 100%; height: 150px; object-fit: cover; border: 1px solid var(--line); }
-          @page { margin: 16mm; }
-        </style>
-      </head>
-      <body>
-        <header>
-          <h1>Relatórios diários - Trecho 2</h1>
-          <p class="meta">Infraestrutura ferroviária • Gerado em ${new Date().toLocaleString("pt-BR")}</p>
-        </header>
-        ${reports.map(report => `
-          <section class="report">
-            <h2>${escapeHtml(report.obraId)} • ${escapeHtml(report.obraNome || "Obra")}</h2>
-            <p class="meta">${formatDate(report.data)} • Fiscal: ${escapeHtml(report.fiscal || "-")} • Turno: ${escapeHtml(report.turno || "-")}</p>
-            <div class="grid">
-              <div><span class="label">Serviço:</span> ${escapeHtml(report.tipoServico || "-")}</div>
-              <div><span class="label">Clima:</span> ${escapeHtml(report.clima || "-")}</div>
-              <div><span class="label">KM:</span> ${escapeHtml(report.kmInicio || "-")} → ${escapeHtml(report.kmFim || "-")}</div>
-              <div><span class="label">Executado no dia:</span> ${formatMeters(report.metrosExecutadosDia)}</div>
-              <div><span class="label">Meta PDM:</span> ${formatMeters(report.metaPdmMetros)}</div>
-              <div><span class="label">Base:</span> ${escapeHtml(report.base || "-")}</div>
-            </div>
-            <div class="checklist">
-              <p><span class="label">Encarregado:</span> ${escapeHtml(report.encarregado || "-")}</p>
-              <p><span class="label">Atividade:</span> ${escapeHtml(report.atividadePrincipal || "-")}</p>
-              <h3>Equipe/equipamentos</h3>
-              <ul>${resourceChecklistToHtml(report.equipeRecursos || [])}</ul>
-            </div>
-            <h3>Atividades por horário</h3>
-            <ul>${(report.atividades || []).map(activity => `<li><strong>${escapeHtml(activity.hora || "--:--")}</strong> - ${escapeHtml(activity.descricao || "")}</li>`).join("") || "<li>Sem atividades registradas.</li>"}</ul>
-            <h3>Condições da execução</h3>
-            <p>${escapeHtml(report.condicoesExecucao || "-")}</p>
-            <h3>Segurança / interferências</h3>
-            <p>${escapeHtml(report.segurancaInterferencias || "-")}</p>
-            <h3>Não conformidades</h3>
-            <p>${escapeHtml(report.naoConformidades || "-")}</p>
-            ${(report.fotos || []).length ? `<h3>Fotos</h3><div class="photos">${report.fotos.map((photo, index) => `<img src="${photo.dataUrl}" alt="Foto ${index + 1}" />`).join("")}</div>` : ""}
-          </section>
-        `).join("")}
-        <script>window.onload = () => { window.print(); };<\/script>
-      </body>
-    </html>
-  `;
-
-  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=920,height=720");
-  if (!printWindow) {
-    showToast("O navegador bloqueou a janela de impressão. Libere pop-ups para gerar PDF.");
-    return;
-  }
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+function unique(values) {
+  return Array.from(new Set(values.filter((value) => value !== null && value !== undefined && String(value).trim() !== "")));
 }
 
-function setupCoordinatorTools() {
-  $("#importReportsInput").addEventListener("change", handleImportReports);
-  $("#applyReportsBtn").addEventListener("click", applyImportedReports);
-  $("#downloadWorksBtn").addEventListener("click", () => downloadJson(state.worksData, "obras.json"));
-  $("#resetLocalDataBtn").addEventListener("click", resetLocalWorks);
-  $("#addWorkBtn").addEventListener("click", addManualWork);
-}
-
-async function handleImportReports(event) {
-  const files = Array.from(event.target.files || []);
-  state.reportsToApply = [];
-  $("#applyReportsBtn").disabled = true;
-  $("#importPreview").innerHTML = "";
-  if (!files.length) return;
-
-  const imported = [];
-  for (const file of files) {
-    try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      const reports = Array.isArray(json) ? json : (json.relatorios || json.reports || []);
-      reports.forEach(report => imported.push(normalizeImportedReport(report)));
-    } catch (error) {
-      console.error(error);
-      showToast(`Não foi possível ler o arquivo ${file.name}.`);
-    }
-  }
-
-  state.reportsToApply = imported.filter(report => report.obraId && report.metrosExecutadosDia > 0);
-  renderImportPreview();
-  $("#applyReportsBtn").disabled = state.reportsToApply.length === 0;
-}
-
-function normalizeImportedReport(report) {
-  return {
-    ...report,
-    id: report.id || safeId(),
-    obraId: report.obraId || report.obra || report.workId || "",
-    obraNome: report.obraNome || report.workName || "",
-    fiscal: report.fiscal || report.responsavel || "",
-    data: report.data || report.date || todayIso(),
-    metrosExecutadosDia: toNumber(report.metrosExecutadosDia ?? report.executadoMetros ?? report.executedMeters ?? report.metros)
-  };
-}
-
-function renderImportPreview() {
-  const preview = $("#importPreview");
-  if (!state.reportsToApply.length) {
-    preview.innerHTML = `<div class="empty-state">Nenhum apontamento com obra e metros executados foi encontrado.</div>`;
-    return;
-  }
-
-  const grouped = state.reportsToApply.reduce((acc, report) => {
-    acc[report.obraId] = acc[report.obraId] || { count: 0, meters: 0, name: report.obraNome };
-    acc[report.obraId].count += 1;
-    acc[report.obraId].meters += report.metrosExecutadosDia;
+function countBy(rows, getter) {
+  return rows.reduce((acc, row) => {
+    const key = getter(row);
+    acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
-
-  preview.innerHTML = Object.entries(grouped).map(([obraId, info]) => `
-    <div class="import-row">
-      <span><strong>${escapeHtml(obraId)}</strong> ${escapeHtml(info.name || "")}</span>
-      <span>${info.count} relatório(s) • +${formatMeters(info.meters)}</span>
-    </div>
-  `).join("");
 }
 
-function applyImportedReports() {
-  if (!state.reportsToApply.length) return;
-
-  let appliedCount = 0;
-  let ignoredCount = 0;
-  const works = getWorks();
-
-  state.reportsToApply.forEach(report => {
-    const work = works.find(item => item.id === report.obraId);
-    if (!work) {
-      ignoredCount += 1;
-      return;
-    }
-
-    work.apontamentosAplicados = work.apontamentosAplicados || [];
-    if (work.apontamentosAplicados.includes(report.id)) {
-      ignoredCount += 1;
-      return;
-    }
-
-    work.executadoMetros = toNumber(work.executadoMetros) + toNumber(report.metrosExecutadosDia);
-    work.ultimaAtualizacao = report.data || todayIso();
-    work.responsavel = report.fiscal || work.responsavel;
-    work.apontamentosAplicados.push(report.id);
-
-    const pct = percent(work.executadoMetros, work.metaMetros);
-    if (pct >= 100) work.status = "Concluída";
-    else if (work.status === "Planejada") work.status = "Em andamento";
-
-    appliedCount += 1;
-  });
-
-  saveWorksLocal();
-  renderAll();
-  showToast(`${appliedCount} apontamento(s) aplicado(s). ${ignoredCount} ignorado(s) por duplicidade ou obra inexistente.`);
-  openTab("dashboard");
+function sortNumericText(a, b) {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+  return String(a).localeCompare(String(b), "pt-BR");
 }
 
-function resetLocalWorks() {
-  if (!window.confirm("Remover atualizações locais e voltar ao arquivo data/obras.json do repositório?")) return;
-  localStorage.removeItem(STORAGE.works);
-  state.worksData = clone(state.baseData || fallbackWorksData);
-  renderAll();
-  showToast("Base local redefinida para o arquivo do repositório.");
+function formatMeters(value) {
+  const number = Number(value) || 0;
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(number)} m`;
 }
 
-function addManualWork() {
-  const id = $("#newWorkId").value.trim();
-  const nome = $("#newWorkName").value.trim();
-  if (!id || !nome) {
-    showToast("Informe ID e nome da obra para adicionar.");
-    return;
-  }
-
-  if (getWorks().some(work => work.id === id)) {
-    showToast("Já existe uma obra com este ID.");
-    return;
-  }
-
-  state.worksData.obras.push({
-    id,
-    nome,
-    frente: $("#newWorkFront").value.trim() || "Infraestrutura",
-    tipo: $("#newWorkFront").value.trim() || "Serviço de infraestrutura",
-    kmInicio: "",
-    kmFim: "",
-    metaMetros: toNumber($("#newWorkGoal").value),
-    executadoMetros: toNumber($("#newWorkDone").value),
-    responsavel: "",
-    status: $("#newWorkStatus").value,
-    ultimaAtualizacao: todayIso(),
-    observacoes: "Adicionada manualmente pelo site.",
-    apontamentosAplicados: []
-  });
-
-  ["#newWorkId", "#newWorkName", "#newWorkFront", "#newWorkGoal", "#newWorkDone"].forEach(selector => $(selector).value = "");
-  saveWorksLocal();
-  renderAll();
-  showToast("Obra adicionada ao dashboard local. Baixe o obras.json para commitar.");
+function formatPercent(value) {
+  const number = Number(value) || 0;
+  const normalized = number > 1 ? number / 100 : number;
+  return `${new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(normalized * 100)}%`;
 }
 
-function downloadJson(payload, filename) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+function clampPercent(value) {
+  const number = Number(value) || 0;
+  const normalized = number > 1 ? number / 100 : number;
+  return Math.max(0, Math.min(100, normalized * 100));
+}
+
+function formatKm(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "—";
+  const km = Math.floor(number / 1000);
+  const meters = Math.round(number % 1000).toString().padStart(3, "0");
+  return `${km}+${meters}`;
+}
+
+function formatKmRange(start, end) {
+  if (!Number.isFinite(Number(start)) && !Number.isFinite(Number(end))) return "—";
+  return `${formatKm(start)} a ${formatKm(end)}`;
+}
+
+function formatPrazo(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return escapeHtml(String(value));
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(number)} mês(es)`;
+}
+
+function latestDateLabel(values) {
+  const dates = values
+    .map((value) => value ? new Date(value) : null)
+    .filter((date) => date && !Number.isNaN(date.getTime()));
+
+  if (!dates.length) return "—";
+  const latest = new Date(Math.max(...dates.map((date) => date.getTime())));
+  return latest.toLocaleDateString("pt-BR");
+}
+
+function statusClass(status) {
+  const normalized = normalizeHeader(status);
+  if (normalized.includes("CONCLUI")) return "status-concluido";
+  if (normalized.includes("ANDAMENTO")) return "status-andamento";
+  return "status-nao-iniciado";
+}
+
+function riskClass(risk) {
+  const normalized = normalizeHeader(risk);
+  if (normalized.includes("ALTO")) return "risk-alto";
+  if (normalized.includes("MODERADO")) return "risk-moderado";
+  return "";
+}
+
+function showStatus(message) {
+  const el = document.getElementById("statusMessage");
+  el.textContent = message;
+  el.classList.add("show");
+}
+
+function hideStatus() {
+  const el = document.getElementById("statusMessage");
+  el.textContent = "";
+  el.classList.remove("show");
 }
 
 function escapeHtml(value) {
@@ -894,4 +798,10 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-document.addEventListener("DOMContentLoaded", init);
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("`", "&#096;");
+}
+
+function stripHtml(value) {
+  return String(value ?? "").replace(/<[^>]+>/g, "");
+}

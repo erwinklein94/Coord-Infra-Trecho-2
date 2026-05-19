@@ -3,341 +3,208 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trecho 2 | Controle de Infraestrutura Ferroviária</title>
-  <meta name="description" content="Controle de relatórios diários e dashboard de metas de infraestrutura ferroviária do Trecho 2." />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Trecho 2 | Dashboard PDM Infraestrutura</title>
+  <meta name="description" content="Dashboard PDM Trecho 2 para acompanhamento de limpeza de lastro e obras de infraestrutura ferroviária." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="page-shell">
-    <header class="topbar">
-      <a class="brand" href="#dashboard" aria-label="Ir para o dashboard">
-        <span class="brand-mark" aria-hidden="true">R</span>
-        <span>
-          <strong>Trecho 2</strong>
-          <small>Infraestrutura ferroviária</small>
-        </span>
-      </a>
-
-      <div class="topbar-actions">
-        <nav class="tabs" aria-label="Navegação principal">
-          <button class="tab-button active" data-target="dashboard">Dashboard</button>
-          <button class="tab-button" data-target="relatorio">Relatório do fiscal</button>
-          <button class="tab-button" data-target="historico">Histórico</button>
-          <button class="tab-button" data-target="atualizar">Atualizar dados</button>
-        </nav>
-        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema claro/escuro">☾</button>
+  <header class="site-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">r</div>
+      <div>
+        <strong class="brand-name">rumo</strong>
+        <span class="brand-subtitle">Trecho 2 • PDM Infraestrutura</span>
       </div>
-    </header>
-
-    <main>
-      <section class="hero section-card">
-        <div>
-          <p class="eyebrow">Plano de Manutenção • PDM</p>
-          <h1>Controle de metas de infraestrutura do Trecho 2</h1>
-          <p class="hero-text">Registre a fiscalização diária, exporte relatórios e acompanhe a evolução das obras de lastro, sublastro, drenagem, taludes, bueiros, canaletas e demais itens que sustentam a via.</p>
-          <div class="hero-actions">
-            <button class="primary-action" data-target="relatorio">Novo relatório</button>
-            <button class="ghost-action" data-target="dashboard">Ver progresso</button>
-          </div>
-        </div>
-
-      </section>
-
-      <section id="dashboard" class="tab-panel active" aria-labelledby="dashboard-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Visão da coordenação</p>
-            <h2 id="dashboard-title">Dashboard das obras</h2>
-          </div>
-          <div class="toolbar">
-            <input id="dashboardSearch" type="search" placeholder="Buscar obra, KM ou serviço" aria-label="Buscar obra" />
-            <select id="statusFilter" aria-label="Filtrar por status">
-              <option value="todos">Todos os status</option>
-              <option value="Planejada">Planejada</option>
-              <option value="Em andamento">Em andamento</option>
-              <option value="Atenção">Atenção</option>
-              <option value="Concluída">Concluída</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="kpi-grid" id="kpiGrid"></div>
-        <div class="dashboard-grid" id="obraCards"></div>
-      </section>
-
-      <section id="relatorio" class="tab-panel" aria-labelledby="relatorio-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Preenchimento dos fiscais</p>
-            <h2 id="relatorio-title">Relatório diário de fiscalização</h2>
-          </div>
-          <span class="hint-pill">As informações ficam salvas neste navegador.</span>
-        </div>
-
-        <form id="reportForm" class="section-card form-grid">
-          <fieldset>
-            <legend>Identificação</legend>
-            <div class="field-row two-columns">
-              <label>Fiscal
-                <input id="fiscalName" name="fiscalName" type="text" placeholder="Nome do fiscal" required />
-              </label>
-              <label>Data
-                <input id="reportDate" name="reportDate" type="date" required />
-              </label>
-            </div>
-            <div class="field-row three-columns">
-              <label>Turno
-                <select id="shift" name="shift">
-                  <option>Diurno</option>
-                  <option>Noturno</option>
-                  <option>Integral</option>
-                </select>
-              </label>
-              <label>Clima
-                <select id="weather" name="weather">
-                  <option>Estável</option>
-                  <option>Chuva</option>
-                  <option>Nublado</option>
-                  <option>Calor intenso</option>
-                  <option>Outro</option>
-                </select>
-              </label>
-              <label>Base / Local de partida
-                <input id="baseLocation" name="baseLocation" type="text" placeholder="Ex.: Base Trecho 2" />
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Obra acompanhada</legend>
-            <div class="field-row two-columns">
-              <label>Obra / frente de serviço
-                <select id="obraSelect" name="obraSelect" required></select>
-              </label>
-              <label>Tipo de serviço
-                <input id="serviceType" name="serviceType" type="text" placeholder="Ex.: Canaleta, bueiro, talude, lastro" />
-              </label>
-            </div>
-            <div class="field-row four-columns">
-              <label>KM inicial
-                <input id="kmStart" name="kmStart" type="text" placeholder="Ex.: 101+200" />
-              </label>
-              <label>KM final
-                <input id="kmEnd" name="kmEnd" type="text" placeholder="Ex.: 101+900" />
-              </label>
-              <label>Meta PDM (m)
-                <input id="plannedMeters" name="plannedMeters" type="number" min="0" step="0.01" placeholder="700" />
-              </label>
-              <label>Executado no dia (m)
-                <input id="executedMeters" name="executedMeters" type="number" min="0" step="0.01" placeholder="0" required />
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Equipe e recursos em campo</legend>
-            <div class="field-row two-columns">
-              <label>Encarregado da frente
-                <input id="crewLeader" name="crewLeader" type="text" placeholder="Nome do encarregado" />
-              </label>
-              <label>Atividade principal
-                <input id="mainActivity" name="mainActivity" type="text" placeholder="Ex.: limpeza de canaleta, recomposição de talude..." />
-              </label>
-            </div>
-            <div class="checklist-grid" id="resourceChecklist" aria-label="Checklist de equipe e equipamentos">
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Encarregado" />
-                <span>Encarregado</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Chefe de boletim" />
-                <span>Chefe de boletim</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Motorista" />
-                <span>Motorista</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Operador EGP" />
-                <span>Operador EGP</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Operador EPP" />
-                <span>Operador EPP</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Ajudante" />
-                <span>Ajudante</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Caminhão Cabine Articulada 4x2" />
-                <span>Caminhão Cabine Articulada 4x2</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" />
-                <input type="number" class="resource-qty" min="0" step="1" value="0" aria-label="Quantidade de caminhão 6x4" />
-                <span>Caminhão 6x4</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" />
-                <input type="number" class="resource-qty" min="0" step="1" value="0" aria-label="Quantidade de mini escavadeira" />
-                <span>Mini escavadeira</span>
-              </label>
-              <label class="checklist-item">
-                <input type="checkbox" class="resource-present" checked />
-                <input type="number" class="resource-qty" min="0" step="1" value="1" aria-label="Quantidade de Escavadeira hidráulica" />
-                <span>Escavadeira hidráulica</span>
-              </label>
-            </div>
-            <small class="field-help">Use a quantidade para gerar o texto do relatório. Itens desmarcados serão salvos com quantidade 0.</small>
-          </fieldset>
-
-          <fieldset>
-            <legend>Atividades por horário</legend>
-            <div id="activityList" class="activity-list"></div>
-            <button type="button" class="secondary-action" id="addActivityBtn">+ Adicionar horário</button>
-          </fieldset>
-
-          <fieldset>
-            <legend>Condições, segurança e observações</legend>
-            <div class="field-row two-columns">
-              <label>Condições da execução
-                <textarea id="qualityNotes" rows="4" placeholder="Qualidade observada, recursos, impedimentos, equipes, equipamentos..."></textarea>
-              </label>
-              <label>Segurança / interferências
-                <textarea id="safetyNotes" rows="4" placeholder="Sinalização, bloqueio, riscos, pontos de atenção..."></textarea>
-              </label>
-            </div>
-            <label>Não conformidades ou pendências
-              <textarea id="nonConformities" rows="3" placeholder="Registre pendências, retrabalho necessário ou nenhuma ocorrência."></textarea>
-            </label>
-            <label>Fotos da fiscalização
-              <input id="photoInput" type="file" accept="image/*" multiple />
-              <small class="field-help">As fotos são comprimidas e salvas localmente no navegador. Para muitos registros, prefira exportar JSON/PDF com frequência.</small>
-            </label>
-            <div id="photoPreview" class="photo-preview"></div>
-          </fieldset>
-
-          <div class="form-actions">
-            <button type="submit" class="primary-action">Salvar relatório</button>
-            <button type="button" class="ghost-action" id="clearFormBtn">Limpar formulário</button>
-          </div>
-        </form>
-      </section>
-
-      <section id="historico" class="tab-panel" aria-labelledby="historico-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Consulta local</p>
-            <h2 id="historico-title">Histórico de relatórios</h2>
-          </div>
-          <div class="toolbar">
-            <input id="periodStart" type="date" aria-label="Data inicial" />
-            <input id="periodEnd" type="date" aria-label="Data final" />
-          </div>
-        </div>
-
-        <div class="section-card export-card">
-          <div>
-            <h3>Exportar período selecionado</h3>
-            <p>Use JSON para enviar à coordenação e alimentar o dashboard. PDF/WhatsApp servem para comunicação e registro visual.</p>
-          </div>
-          <div class="export-actions">
-            <button class="primary-action" id="exportJsonBtn">Baixar JSON</button>
-            <button class="secondary-action" id="exportPdfBtn">Gerar PDF</button>
-            <button class="whatsapp-action" id="exportWhatsBtn">Enviar texto WhatsApp</button>
-          </div>
-        </div>
-
-        <div id="historyList" class="history-list"></div>
-      </section>
-
-      <section id="atualizar" class="tab-panel" aria-labelledby="atualizar-title">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Rotina da coordenação</p>
-            <h2 id="atualizar-title">Atualizar dados do dashboard</h2>
-          </div>
-          <span class="hint-pill">Fluxo pensado para GitHub Pages</span>
-        </div>
-
-        <div class="update-layout">
-          <article class="section-card">
-            <h3>1. Importar relatórios JSON dos fiscais</h3>
-            <p>Após receber os arquivos JSON, importe aqui. O sistema soma os metros executados por obra e evita duplicidade quando o mesmo relatório já foi aplicado.</p>
-            <label class="file-drop">Selecionar JSON dos fiscais
-              <input id="importReportsInput" type="file" accept="application/json,.json" multiple />
-            </label>
-            <div id="importPreview" class="import-preview"></div>
-            <button class="primary-action" id="applyReportsBtn" disabled>Aplicar no dashboard local</button>
-          </article>
-
-          <article class="section-card">
-            <h3>2. Baixar base atualizada para commit</h3>
-            <p>Depois de aplicar os relatórios, baixe o arquivo e substitua <code>data/obras.json</code> no repositório. Faça commit no GitHub para todos verem o dashboard atualizado.</p>
-            <button class="primary-action" id="downloadWorksBtn">Baixar obras.json atualizado</button>
-            <button class="ghost-action" id="resetLocalDataBtn">Voltar para base do repositório</button>
-          </article>
-
-          <article class="section-card manual-card">
-            <h3>Adicionar obra manualmente</h3>
-            <div class="field-row two-columns">
-              <label>ID da obra
-                <input id="newWorkId" type="text" placeholder="OBR-006" />
-              </label>
-              <label>Status
-                <select id="newWorkStatus">
-                  <option>Planejada</option>
-                  <option>Em andamento</option>
-                  <option>Atenção</option>
-                  <option>Concluída</option>
-                </select>
-              </label>
-            </div>
-            <label>Nome da obra
-              <input id="newWorkName" type="text" placeholder="Ex.: Reconformação de talude - KM 120+000" />
-            </label>
-            <div class="field-row three-columns">
-              <label>Frente
-                <input id="newWorkFront" type="text" placeholder="Drenagem" />
-              </label>
-              <label>Meta (m)
-                <input id="newWorkGoal" type="number" min="0" step="0.01" placeholder="700" />
-              </label>
-              <label>Executado (m)
-                <input id="newWorkDone" type="number" min="0" step="0.01" placeholder="0" />
-              </label>
-            </div>
-            <button class="secondary-action" id="addWorkBtn">Adicionar ao dashboard local</button>
-          </article>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer-accent" aria-hidden="true">
-      <span></span><span></span><span></span><span></span><span></span><span></span>
-    </footer>
-  </div>
-
-  <template id="activityTemplate">
-    <div class="activity-item">
-      <input type="time" class="activity-time" aria-label="Horário da atividade" />
-      <input type="text" class="activity-description" placeholder="Descrição da atividade realizada" aria-label="Descrição da atividade" />
-      <button type="button" class="icon-button remove-activity" aria-label="Remover atividade">×</button>
     </div>
-  </template>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar entre tema claro e escuro">
+      <span class="theme-dot" aria-hidden="true"></span>
+      <span id="themeToggleText">Tema escuro</span>
+    </button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Controle operacional</span>
+        <h1>Dashboard do Plano de Manutenção — Trecho 2</h1>
+        <p>
+          Acompanhamento da evolução de limpeza de lastro e obras de infraestrutura ferroviária
+          a partir da planilha principal do PDM.
+        </p>
+      </div>
+
+      <div class="hero-panel">
+        <div class="mini-metric">
+          <span>Fonte de dados</span>
+          <strong id="sourceLabel">Carregando...</strong>
+        </div>
+        <div class="mini-metric">
+          <span>Atualização</span>
+          <strong id="lastUpdateLabel">—</strong>
+        </div>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="Navegação do dashboard">
+      <button class="tab active" type="button" data-panel="overview">Visão geral</button>
+      <button class="tab" type="button" data-panel="limpeza">Limpeza de lastro</button>
+      <button class="tab" type="button" data-panel="obras">Obras DR</button>
+      <button class="tab" type="button" data-panel="dados">Fonte de dados</button>
+    </nav>
+
+    <section class="status-message" id="statusMessage" role="status" aria-live="polite"></section>
+
+    <section class="panel active" id="panel-overview">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Resumo executivo</span>
+          <h2>Visão geral do PDM</h2>
+        </div>
+      </div>
+
+      <div class="kpi-grid" id="overviewKpis"></div>
+
+      <div class="split-grid">
+        <article class="surface-card">
+          <div class="card-head">
+            <div>
+              <span class="eyebrow">Limpeza de lastro</span>
+              <h3>Evolução por SUB</h3>
+            </div>
+          </div>
+          <div id="overviewSubList" class="compact-list"></div>
+        </article>
+
+        <article class="surface-card">
+          <div class="card-head">
+            <div>
+              <span class="eyebrow">Obras</span>
+              <h3>Status das obras DR</h3>
+            </div>
+          </div>
+          <div id="overviewObrasList" class="compact-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-limpeza">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">ZBV-ZAR PDM Limpeza DR</span>
+          <h2>Limpeza de lastro por SUB</h2>
+          <p>Cards gerados a partir da soma de EXT planejada e EXT REAL executada em cada SUB.</p>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <label>
+          SUB
+          <select id="limpezaSubFilter">
+            <option value="">Todas</option>
+          </select>
+        </label>
+        <label class="grow">
+          Buscar
+          <input type="search" id="limpezaSearch" placeholder="Buscar SB, equipamento ou atividade..." />
+        </label>
+      </div>
+
+      <div class="cards-grid" id="limpezaCards"></div>
+    </section>
+
+    <section class="panel" id="panel-obras">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">ZBV-ZAR Obras DR</span>
+          <h2>Dashboard de obras</h2>
+          <p>Cards com status, risco, prazo, localização e observações das obras cadastradas na planilha.</p>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <label>
+          SUB
+          <select id="obrasSubFilter">
+            <option value="">Todas</option>
+          </select>
+        </label>
+        <label>
+          Status
+          <select id="obrasStatusFilter">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label>
+          Risco
+          <select id="obrasRiscoFilter">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label class="grow">
+          Buscar
+          <input type="search" id="obrasSearch" placeholder="Buscar descrição, equipamento, motivo ou SB..." />
+        </label>
+      </div>
+
+      <div class="cards-grid obras-grid" id="obrasCards"></div>
+    </section>
+
+    <section class="panel" id="panel-dados">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Integração</span>
+          <h2>Fonte única da verdade: planilha PDM</h2>
+          <p>
+            O site foi preparado para ler a planilha online publicada em CSV. Enquanto as URLs estiverem vazias,
+            ele usa os dados de exemplo extraídos da planilha anexada.
+          </p>
+        </div>
+      </div>
+
+      <div class="surface-card data-card">
+        <h3>URLs das abas publicadas em CSV</h3>
+        <p class="muted">
+          Depois de publicar a planilha PDM na web, cole aqui a URL CSV de cada aba. O navegador salva essa
+          configuração localmente. Para deixar centralizado para todos, edite o arquivo <code>data/source-config.json</code>.
+        </p>
+
+        <div class="source-form">
+          <label>
+            CSV — ZBV-ZAR PDM Limpeza DR
+            <input id="limpezaCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/...output=csv" />
+          </label>
+
+          <label>
+            CSV — ZBV-ZAR Obras DR
+            <input id="obrasCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/...output=csv" />
+          </label>
+
+          <div class="source-actions">
+            <button class="primary-btn" id="saveSourceBtn" type="button">Salvar e recarregar</button>
+            <button class="secondary-btn" id="reloadSourceBtn" type="button">Recarregar agora</button>
+            <button class="ghost-btn" id="clearSourceBtn" type="button">Limpar URLs locais</button>
+          </div>
+        </div>
+
+        <div class="hint-box">
+          <strong>Fluxo recomendado</strong>
+          <p>
+            Fiscais enviam dados padronizados → analista atualiza a planilha PDM principal →
+            o site lê a aba online e recalcula automaticamente os cards.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-tiles" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <p>Trecho 2 • Infraestrutura ferroviária • Dashboard PDM</p>
+  </footer>
+
   <script src="script.js"></script>
 </body>
 </html>

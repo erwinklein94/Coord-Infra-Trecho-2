@@ -1,100 +1,94 @@
-# Controle Trecho 2 — Infraestrutura Ferroviária
+# Trecho 2 — Dashboard PDM Infraestrutura
 
-Site estático para GitHub Pages com:
+Este pacote contém um site estático pronto para **GitHub Pages**, com foco na planilha principal do PDM como fonte única de dados.
 
-- Dashboard de obras e metas do PDM.
-- Formulário diário para fiscais, com checklist de equipe/equipamentos.
-- Histórico local no navegador.
-- Exportação de relatórios para JSON, PDF via impressão do navegador e texto para WhatsApp.
-- Tema claro como padrão e tema escuro opcional no botão discreto do topo.
-- Importação de relatórios JSON para atualizar o dashboard e baixar novo `data/obras.json`.
+## O que mudou neste esboço
 
-## Como publicar no GitHub Pages
-
-1. Descompacte o `.zip`.
-2. Envie os arquivos para um repositório GitHub.
-3. No GitHub, vá em **Settings > Pages**.
-4. Selecione **Deploy from a branch**.
-5. Escolha a branch `main` e a pasta `/root`.
-6. Aguarde o link do GitHub Pages ficar disponível.
+- Removida a área antiga de relatório diário do fiscal.
+- Removidos controles que exigiam alimentar o site manualmente.
+- Criados dois dashboards:
+  - **ZBV-ZAR PDM Limpeza DR**
+  - **ZBV-ZAR Obras DR**
+- Criados cards de limpeza de lastro por **SUB**.
+- Criados cards de obras com status, risco, KM, prazo, equipamento e observação.
+- Adicionada tela **Fonte de dados** para conectar a planilha PDM online publicada em CSV.
+- Mantido tema claro como padrão e botão discreto de tema escuro no topo.
 
 ## Arquivos principais
 
-- `index.html`: estrutura do site.
-- `styles.css`: visual e responsividade.
-- `script.js`: lógica do dashboard, relatórios, exportações e importações.
-- `data/obras.json`: base pública das obras exibidas no dashboard.
+```text
+index.html
+styles.css
+script.js
+data/pdm-limpeza.json
+data/obras-dr.json
+data/source-config.json
+```
 
-O tema claro é o padrão para todo usuário que entra pela primeira vez. O tema escuro fica salvo apenas no navegador de quem ativou.
+Os arquivos JSON de exemplo foram gerados a partir da planilha:
 
-## Fluxo recomendado
+```text
+1. UNIFILAR T2 DR.xlsx
+```
 
-### Fiscal
+## Como publicar no GitHub Pages
 
-1. Abre o site.
-2. Vai em **Relatório do fiscal**.
-3. Preenche data, horários, obra, metros executados, checklist de equipe/equipamentos, observações e fotos.
-4. Salva o relatório.
-5. Em **Histórico**, seleciona um período.
-6. Exporta:
-   - **JSON** para enviar à coordenação e alimentar o dashboard.
-   - **PDF** para registro formal.
-   - **WhatsApp** para envio rápido em texto.
+1. Crie um repositório no GitHub.
+2. Envie todos os arquivos deste pacote para a raiz do repositório.
+3. Vá em **Settings > Pages**.
+4. Em **Build and deployment**, selecione:
+   - Source: `Deploy from a branch`
+   - Branch: `main`
+   - Folder: `/root`
+5. Salve e aguarde o link do GitHub Pages.
 
-### Coordenação
+## Como conectar a planilha PDM online
 
-1. Recebe os JSONs dos fiscais.
-2. Abre a aba **Atualizar dados**.
-3. Importa os JSONs.
-4. Clica em **Aplicar no dashboard local**.
-5. Confere a aba **Dashboard**.
-6. Clica em **Baixar obras.json atualizado**.
-7. Substitui o arquivo `data/obras.json` no repositório.
-8. Faz commit para atualizar o GitHub Pages.
+O caminho mais simples é usar Google Planilhas:
 
-## Observações importantes
+1. Suba a planilha PDM para o Google Drive.
+2. Abra no Google Planilhas.
+3. Confira se as abas continuam com estes dados:
+   - `ZBV-ZAR PDM Limpeza DR`
+   - `ZBV-ZAR Obras DR`
+4. Publique cada aba como CSV:
+   - **Arquivo > Compartilhar > Publicar na Web**
+   - Escolha a aba desejada.
+   - Escolha o formato **CSV**.
+5. Copie a URL CSV da aba de limpeza.
+6. Copie a URL CSV da aba de obras.
+7. No site, abra **Fonte de dados** e cole as URLs.
 
-- O site não usa banco de dados nem servidor. Ele roda 100% no navegador.
-- Os relatórios ficam salvos no `localStorage` do navegador de cada fiscal.
-- Ao limpar dados do navegador, o histórico local pode ser perdido.
-- Para evitar perda de informação, oriente os fiscais a exportarem JSON/PDF diariamente.
-- O WhatsApp abre apenas com o texto preenchido; fotos não são anexadas automaticamente por limitação do navegador/WhatsApp Web.
-- O botão PDF abre a janela de impressão. No navegador, escolha **Salvar como PDF**.
+## Configuração central para todos os usuários
 
-## Editar obras iniciais
+Se você não quiser que cada pessoa cole a URL no navegador, edite o arquivo:
 
-Abra `data/obras.json` e ajuste os campos:
+```text
+data/source-config.json
+```
+
+Exemplo:
 
 ```json
 {
-  "id": "OBR-001",
-  "nome": "Nome da obra",
-  "frente": "Drenagem",
-  "tipo": "Canaleta / bueiro / talude",
-  "kmInicio": "101+200",
-  "kmFim": "101+900",
-  "metaMetros": 700,
-  "executadoMetros": 280,
-  "responsavel": "Fiscal 1",
-  "status": "Em andamento",
-  "ultimaAtualizacao": "2026-05-19",
-  "observacoes": "Observações da coordenação",
-  "apontamentosAplicados": []
+  "limpezaCsvUrl": "https://docs.google.com/spreadsheets/d/.../pub?gid=0&single=true&output=csv",
+  "obrasCsvUrl": "https://docs.google.com/spreadsheets/d/.../pub?gid=123&single=true&output=csv"
 }
 ```
 
-Status sugeridos:
+Depois disso, faça commit no GitHub. Todos que abrirem o site passam a ler a planilha online.
 
-- `Planejada`
-- `Em andamento`
-- `Atenção`
-- `Concluída`
+## Observação importante
 
-## Próximas melhorias possíveis
+Evite usar PDF como fonte de dados do dashboard. PDF é bom para visualização e arquivo, mas a leitura automática é frágil. Para o dashboard, use CSV/JSON gerado pela planilha principal do PDM.
 
-- Login por fiscal.
-- Banco de dados real, como Firebase ou Supabase.
-- Sincronização automática sem commit manual.
-- Campos específicos por tipo de obra.
-- Mapa dos KMs.
-- Assinatura digital do fiscal e da coordenação.
+## Dados extraídos neste exemplo
+
+- Limpeza de lastro:
+  - SUBs: 63, 66, 68, 70, 71, 78
+  - Frentes: 133
+- Obras DR:
+  - Obras: 15
+  - SUBs: 63, 68, 70, 78
+
+Gerado em: 19/05/2026 23:11
