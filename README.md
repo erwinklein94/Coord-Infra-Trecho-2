@@ -1,35 +1,54 @@
 # Trecho 2 — Dashboard PDM Infraestrutura
 
-Este pacote contém um site estático pronto para **GitHub Pages**, com foco na planilha principal do PDM como fonte única de dados.
+Site estático pronto para **GitHub Pages**, agora configurado como **dashboard local** para proteger os dados da planilha PDM.
 
-## O que mudou neste esboço
+## Como funciona
 
-- Removida a área antiga de relatório diário do fiscal.
-- Removidos controles que exigiam alimentar o site manualmente.
-- Criados dois dashboards:
-  - **ZBV-ZAR PDM Limpeza**
-  - **ZBV-ZAR Obras**
-- Criados cards de limpeza de lastro por **SUB**.
-- Criados cards de obras com status, risco matriz, KM, prazo, equipamento e observação.
-- Adicionada tela **Fonte de dados** para conectar a planilha PDM online publicada em CSV.
-- Mantido tema claro como padrão e botão discreto de tema escuro no topo.
+1. Abra o site.
+2. Vá em **Fonte de dados**.
+3. Clique em **Importar planilha**.
+4. Selecione a planilha PDM atualizada em formato `.xlsx` ou `.xlsm`.
+5. O dashboard será gerado no próprio navegador.
 
-## Arquivos principais
+A planilha **não precisa ser publicada online** e não fica armazenada no GitHub.
 
-```text
-index.html
-styles.css
-script.js
-data/pdm-limpeza.json
-data/obras-dr.json
-data/source-config.json
-```
+## Abas esperadas na planilha
 
-Os arquivos JSON de exemplo foram gerados a partir da planilha:
+O sistema procura estas abas:
 
-```text
-1. UNIFILAR T2 DR.xlsx
-```
+- `ZBV-ZAR PDM Limpeza DR` ou `ZBV-ZAR PDM Limpeza`
+- `ZBV-ZAR Obras DR` ou `ZBV-ZAR Obras`
+
+A estrutura das colunas deve seguir a planilha usada como modelo neste projeto.
+
+## Dashboards incluídos
+
+- **Visão geral**
+- **Limpeza Geral**
+  - Cards por SUB
+  - Percentual por SUB
+  - Planejado, executado e saldo
+  - Detalhes dos equipamentos
+- **Obras**
+  - Cards por obra
+  - SUB, KM, status, risco matriz, tipo, equipamento, extensão, motivo e observação
+- **Fonte de dados**
+  - Importação local da planilha PDM
+
+## Segurança dos dados
+
+Este modelo evita publicar a planilha real em serviços externos. O arquivo Excel é lido localmente no navegador da pessoa que está usando o site.
+
+Pontos importantes:
+
+- Não coloque a planilha real dentro do repositório do GitHub.
+- Não publique CSV, JSON ou PDF com dados sigilosos no GitHub Pages.
+- Use os arquivos `data/pdm-limpeza.json` e `data/obras-dr.json` apenas como exemplo visual.
+- Para dados reais, importe a planilha localmente pela aba **Fonte de dados**.
+
+## Compatibilidade
+
+A leitura local de Excel usa recursos modernos do navegador. Recomenda-se usar **Google Chrome** ou **Microsoft Edge** atualizados.
 
 ## Como publicar no GitHub Pages
 
@@ -42,53 +61,15 @@ Os arquivos JSON de exemplo foram gerados a partir da planilha:
    - Folder: `/root`
 5. Salve e aguarde o link do GitHub Pages.
 
-## Como conectar a planilha PDM online
-
-O caminho mais simples é usar Google Planilhas:
-
-1. Suba a planilha PDM para o Google Drive.
-2. Abra no Google Planilhas.
-3. Confira se as abas continuam com estes dados:
-   - `ZBV-ZAR PDM Limpeza`
-   - `ZBV-ZAR Obras`
-4. Publique cada aba como CSV:
-   - **Arquivo > Compartilhar > Publicar na Web**
-   - Escolha a aba desejada.
-   - Escolha o formato **CSV**.
-5. Copie a URL CSV da aba de limpeza.
-6. Copie a URL CSV da aba de obras.
-7. No site, abra **Fonte de dados** e cole as URLs.
-
-## Configuração central para todos os usuários
-
-Se você não quiser que cada pessoa cole a URL no navegador, edite o arquivo:
+## Arquivos principais
 
 ```text
+index.html
+styles.css
+script.js
+data/pdm-limpeza.json
+data/obras-dr.json
 data/source-config.json
 ```
 
-Exemplo:
-
-```json
-{
-  "limpezaCsvUrl": "https://docs.google.com/spreadsheets/d/.../pub?gid=0&single=true&output=csv",
-  "obrasCsvUrl": "https://docs.google.com/spreadsheets/d/.../pub?gid=123&single=true&output=csv"
-}
-```
-
-Depois disso, faça commit no GitHub. Todos que abrirem o site passam a ler a planilha online.
-
-## Observação importante
-
-Evite usar PDF como fonte de dados do dashboard. PDF é bom para visualização e arquivo, mas a leitura automática é frágil. Para o dashboard, use CSV/JSON gerado pela planilha principal do PDM.
-
-## Dados extraídos neste exemplo
-
-- Limpeza Geral:
-  - SUBs: 63, 66, 68, 70, 71, 78
-  - Equipamentos: 133
-- Obras:
-  - Obras: 15
-  - SUBs: 63, 68, 70, 78
-
-Gerado em: 19/05/2026 23:11
+Gerado para o fluxo de dashboard local.

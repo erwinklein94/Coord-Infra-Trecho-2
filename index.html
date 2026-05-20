@@ -137,45 +137,41 @@
     <section class="panel" id="panel-dados">
       <div class="section-heading">
         <div>
-          <span class="eyebrow">Integração</span>
-          <h2>Fonte única da verdade: planilha PDM</h2>
+          <span class="eyebrow">Dashboard local</span>
+          <h2>Fonte de dados: importar planilha PDM</h2>
           <p>
-            O site foi preparado para ler a planilha online publicada em CSV. Enquanto as URLs estiverem vazias,
-            ele usa os dados de exemplo extraídos da planilha anexada.
+            Importe a planilha PDM atualizada diretamente do computador. O dashboard lê as abas da planilha no próprio navegador,
+            sem publicar arquivo, sem link online e sem enviar dados para servidor.
           </p>
         </div>
       </div>
 
       <div class="surface-card data-card">
-        <h3>URLs das abas publicadas em CSV</h3>
+        <h3>Importar planilha local</h3>
         <p class="muted">
-          Depois de publicar a planilha PDM na web, cole aqui a URL CSV de cada aba. O navegador salva essa
-          configuração localmente. Para deixar centralizado para todos, edite o arquivo <code>data/source-config.json</code>.
+          Use a mesma estrutura da planilha atual, com as abas <strong>ZBV-ZAR PDM Limpeza DR</strong> e
+          <strong>ZBV-ZAR Obras DR</strong>. O sistema também aceita os nomes sem “DR”.
         </p>
 
         <div class="source-form">
           <label>
-            CSV — ZBV-ZAR PDM Limpeza
-            <input id="limpezaCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/...output=csv" />
-          </label>
-
-          <label>
-            CSV — ZBV-ZAR Obras
-            <input id="obrasCsvUrl" type="url" placeholder="https://docs.google.com/spreadsheets/...output=csv" />
+            Planilha PDM atualizada (.xlsx ou .xlsm)
+            <input id="pdmFileInput" type="file" accept=".xlsx,.xlsm" />
           </label>
 
           <div class="source-actions">
-            <button class="primary-btn" id="saveSourceBtn" type="button">Salvar e recarregar</button>
-            <button class="secondary-btn" id="reloadSourceBtn" type="button">Recarregar agora</button>
-            <button class="ghost-btn" id="clearSourceBtn" type="button">Limpar URLs locais</button>
+            <button class="primary-btn" id="importWorkbookBtn" type="button">Importar planilha</button>
+            <button class="ghost-btn" id="resetExampleBtn" type="button">Voltar para dados exemplo</button>
           </div>
         </div>
+
+        <div class="loaded-file" id="loadedFileInfo">Nenhuma planilha local carregada.</div>
 
         <div class="hint-box">
           <strong>Fluxo recomendado</strong>
           <p>
-            Fiscais enviam dados padronizados → analista atualiza a planilha PDM principal →
-            o site lê a aba online e recalcula automaticamente os cards.
+            A planilha real continua protegida no ambiente corporativo. Quando precisar consultar o dashboard, baixe uma cópia autorizada,
+            abra o site e importe o arquivo localmente. Nada precisa ser hospedado no GitHub além do código do site.
           </p>
         </div>
       </div>

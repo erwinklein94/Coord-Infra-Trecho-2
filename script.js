@@ -1,18 +1,21 @@
 const DEFAULT_FILES = {
   limpezaJson: "data/pdm-limpeza.json",
   obrasJson: "data/obras-dr.json",
-  sourceConfig: "data/source-config.json",
 };
 
 const STORAGE_KEYS = {
   theme: "trecho2-pdm-theme",
-  source: "trecho2-pdm-source-config",
+};
+
+const TARGET_SHEETS = {
+  limpeza: ["ZBV-ZAR PDM Limpeza DR", "ZBV-ZAR PDM Limpeza", "PDM Limpeza"],
+  obras: ["ZBV-ZAR Obras DR", "ZBV-ZAR Obras", "Obras DR", "Obras"],
 };
 
 const state = {
   limpeza: { rows: [], subSummary: [], generatedAt: null, sourceSheet: "" },
   obras: { rows: [], generatedAt: null, sourceSheet: "" },
-  sourceLabel: "Dados exemplo",
+  sourceLabel: "Dados exemplo da planilha anexada",
   loadErrors: [],
 };
 
@@ -21,7 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindNavigation();
   bindFilters();
   bindSourceActions();
-  loadData();
+  loadExampleData();
 });
 
 function initTheme() {
@@ -66,132 +69,102 @@ function bindFilters() {
 }
 
 function bindSourceActions() {
-  document.getElementById("saveSourceBtn").addEventListener("click", () => {
-    const config = {
-      limpezaCsvUrl: document.getElementById("limpezaCsvUrl").value.trim(),
-      obrasCsvUrl: document.getElementById("obrasCsvUrl").value.trim(),
-    };
-    localStorage.setItem(STORAGE_KEYS.source, JSON.stringify(config));
-    showStatus("URLs salvas neste navegador. Recarregando os dashboards...");
-    loadData();
+  const fileInput = document.getElementById("pdmFileInput");
+  const importButton = document.getElementById("importWorkbookBtn");
+  const resetButton = document.getElementById("resetExampleBtn");
+
+  if (!fileInput || !importButton || !resetButton) return;
+
+  importButton.addEventListener("click", importSelectedWorkbook);
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files && fileInput.files.length) importSelectedWorkbook();
   });
 
-  document.getElementById("reloadSourceBtn").addEventListener("click", () => {
-    showStatus("Recarregando dados...");
-    loadData();
-  });
-
-  document.getElementById("clearSourceBtn").addEventListener("click", () => {
-    localStorage.removeItem(STORAGE_KEYS.source);
-    document.getElementById("limpezaCsvUrl").value = "";
-    document.getElementById("obrasCsvUrl").value = "";
-    showStatus("URLs locais removidas. O site voltará a usar o arquivo central ou os JSONs de exemplo.");
-    loadData();
+  resetButton.addEventListener("click", () => {
+    fileInput.value = "";
+    loadExampleData();
+    setLoadedFileInfo("Nenhuma planilha local carregada. Usando dados de exemplo.");
   });
 }
 
-async function loadData() {
+async function loadExampleData() {
   state.loadErrors = [];
-  showStatus("Carregando base do PDM...");
-
-  const centralConfig = await readCentralSourceConfig();
-  const localConfig = readLocalSourceConfig();
-  const config = mergeConfigs(centralConfig, localConfig);
-
-  document.getElementById("limpezaCsvUrl").value = localConfig.limpezaCsvUrl || centralConfig.limpezaCsvUrl || "";
-  document.getElementById("obrasCsvUrl").value = localConfig.obrasCsvUrl || centralConfig.obrasCsvUrl || "";
+  showStatus("Carregando dados de exemplo do PDM...");
 
   try {
-    state.limpeza = await loadLimpeza(config);
-  } catch (error) {
-    state.loadErrors.push(`Limpeza Geral: ${error.message}`);
     state.limpeza = await fetchJson(DEFAULT_FILES.limpezaJson);
-  }
+    if (!Array.isArray(state.limpeza.subSummary) || !state.limpeza.subSummary.length) {
+      state.limpeza.subSummary = calculateSubSummary(state.limpeza.rows || []);
+    }
 
-  try {
-    state.obras = await loadObras(config);
-  } catch (error) {
-    state.loadErrors.push(`Obras: ${error.message}`);
     state.obras = await fetchJson(DEFAULT_FILES.obrasJson);
-  }
-
-  const usingCsv = Boolean(config.limpezaCsvUrl || config.obrasCsvUrl);
-  state.sourceLabel = usingCsv ? "Planilha PDM online" : "Dados exemplo da planilha anexada";
-
-  fillFilterOptions();
-  renderAll();
-
-  if (state.loadErrors.length) {
-    showStatus(`Alguns dados online não foram carregados. Usando fallback local. ${state.loadErrors.join(" | ")}`);
-  } else {
+    state.sourceLabel = "Dados exemplo da planilha anexada";
+    fillFilterOptions();
+    renderAll();
+    setLoadedFileInfo("Dados de exemplo carregados. Importe a planilha PDM atualizada para substituir esta base.");
     hideStatus();
+  } catch (error) {
+    showStatus(`Não foi possível carregar os dados de exemplo: ${error.message}`);
   }
 }
 
-async function readCentralSourceConfig() {
+async function importSelectedWorkbook() {
+  const input = document.getElementById("pdmFileInput");
+  const file = input?.files?.[0];
+
+  if (!file) {
+    showStatus("Selecione primeiro a planilha PDM em formato .xlsx ou .xlsm.");
+    return;
+  }
+
+  if (!/\.(xlsx|xlsm)$/i.test(file.name)) {
+    showStatus("Formato não suportado. Use uma planilha .xlsx ou .xlsm.");
+    return;
+  }
+
+  if (typeof DecompressionStream === "undefined") {
+    showStatus("Este navegador não possui suporte necessário para ler Excel localmente. Use Chrome ou Edge atualizado.");
+    return;
+  }
+
+  showStatus("Lendo planilha local no navegador. Nenhum arquivo será enviado para a internet...");
+
   try {
-    const response = await fetch(DEFAULT_FILES.sourceConfig, { cache: "no-store" });
-    if (!response.ok) return {};
-    return await response.json();
-  } catch {
-    return {};
-  }
-}
+    const workbookData = await parsePdmWorkbook(file);
+    const generatedAt = file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString();
 
-function readLocalSourceConfig() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.source) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function mergeConfigs(central, local) {
-  return {
-    limpezaCsvUrl: nonEmpty(local.limpezaCsvUrl) || nonEmpty(central.limpezaCsvUrl) || "",
-    obrasCsvUrl: nonEmpty(local.obrasCsvUrl) || nonEmpty(central.obrasCsvUrl) || "",
-  };
-}
-
-function nonEmpty(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-async function loadLimpeza(config) {
-  if (config.limpezaCsvUrl) {
-    const text = await fetchText(config.limpezaCsvUrl);
-    const matrix = parseCsv(text);
-    const rows = normalizeLimpezaFromMatrix(matrix);
-    return {
+    state.limpeza = {
       title: "ZBV-ZAR PDM Limpeza",
-      sourceSheet: "ZBV-ZAR PDM Limpeza",
-      generatedAt: new Date().toISOString(),
-      rows,
-      subSummary: calculateSubSummary(rows),
+      sourceSheet: workbookData.limpezaSheetName,
+      sourceFile: file.name,
+      generatedAt,
+      rows: workbookData.limpezaRows,
+      subSummary: calculateSubSummary(workbookData.limpezaRows),
     };
-  }
 
-  const data = await fetchJson(DEFAULT_FILES.limpezaJson);
-  if (!Array.isArray(data.subSummary) || !data.subSummary.length) {
-    data.subSummary = calculateSubSummary(data.rows || []);
+    state.obras = {
+      title: "ZBV-ZAR Obras",
+      sourceSheet: workbookData.obrasSheetName,
+      sourceFile: file.name,
+      generatedAt,
+      rows: workbookData.obrasRows,
+    };
+
+    state.sourceLabel = `Planilha local: ${file.name}`;
+    fillFilterOptions();
+    renderAll();
+    setLoadedFileInfo(`Planilha carregada: ${file.name} • Limpeza: ${workbookData.limpezaRows.length} equipamentos • Obras: ${workbookData.obrasRows.length}`);
+    showStatus("Planilha importada com sucesso. O dashboard foi atualizado localmente neste navegador.");
+    setTimeout(hideStatus, 4500);
+  } catch (error) {
+    console.error(error);
+    showStatus(`Não foi possível importar a planilha: ${error.message}`);
   }
-  return data;
 }
 
-async function loadObras(config) {
-  if (config.obrasCsvUrl) {
-    const text = await fetchText(config.obrasCsvUrl);
-    const matrix = parseCsv(text);
-    const rows = normalizeObrasFromMatrix(matrix);
-    return {
-      title: "ZBV-ZAR Obras",
-      sourceSheet: "ZBV-ZAR Obras",
-      generatedAt: new Date().toISOString(),
-      rows,
-    };
-  }
-
-  return await fetchJson(DEFAULT_FILES.obrasJson);
+function setLoadedFileInfo(message) {
+  const el = document.getElementById("loadedFileInfo");
+  if (el) el.textContent = message;
 }
 
 async function fetchJson(url) {
@@ -200,57 +173,236 @@ async function fetchJson(url) {
   return await response.json();
 }
 
-async function fetchText(url) {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Não foi possível ler a URL CSV`);
-  return await response.text();
+async function parsePdmWorkbook(file) {
+  const buffer = await file.arrayBuffer();
+  const zip = parseZipCentralDirectory(buffer);
+
+  const workbookXml = await readZipText(zip, "xl/workbook.xml");
+  const relsXml = await readZipText(zip, "xl/_rels/workbook.xml.rels");
+  const workbookDoc = parseXml(workbookXml, "workbook.xml");
+  const relsDoc = parseXml(relsXml, "workbook.xml.rels");
+  const sharedStrings = await readSharedStrings(zip);
+  const sheets = parseWorkbookSheets(workbookDoc, relsDoc);
+
+  const limpezaSheet = findWorkbookSheet(sheets, TARGET_SHEETS.limpeza);
+  const obrasSheet = findWorkbookSheet(sheets, TARGET_SHEETS.obras);
+
+  if (!limpezaSheet) {
+    throw new Error(`Aba de limpeza não encontrada. Abas disponíveis: ${sheets.map((sheet) => sheet.name).join(", ")}`);
+  }
+
+  if (!obrasSheet) {
+    throw new Error(`Aba de obras não encontrada. Abas disponíveis: ${sheets.map((sheet) => sheet.name).join(", ")}`);
+  }
+
+  const limpezaMatrix = parseWorksheetMatrix(
+    parseXml(await readZipText(zip, limpezaSheet.path), limpezaSheet.path),
+    sharedStrings
+  );
+
+  const obrasMatrix = parseWorksheetMatrix(
+    parseXml(await readZipText(zip, obrasSheet.path), obrasSheet.path),
+    sharedStrings
+  );
+
+  return {
+    limpezaSheetName: limpezaSheet.name,
+    obrasSheetName: obrasSheet.name,
+    limpezaRows: normalizeLimpezaFromMatrix(limpezaMatrix),
+    obrasRows: normalizeObrasFromMatrix(obrasMatrix),
+  };
 }
 
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let cell = "";
-  let inQuotes = false;
+function parseZipCentralDirectory(buffer) {
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  const decoder = new TextDecoder("utf-8");
+  const eocdSignature = 0x06054b50;
+  const centralSignature = 0x02014b50;
+  const localSignature = 0x04034b50;
+  const maxCommentLength = Math.min(bytes.length, 66000);
 
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const next = text[i + 1];
-
-    if (char === '"' && inQuotes && next === '"') {
-      cell += '"';
-      i++;
-      continue;
+  let eocdOffset = -1;
+  for (let i = bytes.length - 22; i >= bytes.length - maxCommentLength; i--) {
+    if (i < 0) break;
+    if (view.getUint32(i, true) === eocdSignature) {
+      eocdOffset = i;
+      break;
     }
-
-    if (char === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
-
-    if (char === "," && !inQuotes) {
-      row.push(cell);
-      cell = "";
-      continue;
-    }
-
-    if ((char === "\n" || char === "\r") && !inQuotes) {
-      if (char === "\r" && next === "\n") i++;
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = "";
-      continue;
-    }
-
-    cell += char;
   }
 
-  if (cell.length || row.length) {
-    row.push(cell);
-    rows.push(row);
+  if (eocdOffset < 0) throw new Error("Arquivo Excel inválido ou corrompido.");
+
+  const centralDirectoryOffset = view.getUint32(eocdOffset + 16, true);
+  const totalEntries = view.getUint16(eocdOffset + 10, true);
+  const entries = new Map();
+  let offset = centralDirectoryOffset;
+
+  for (let i = 0; i < totalEntries; i++) {
+    if (view.getUint32(offset, true) !== centralSignature) break;
+
+    const compressionMethod = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const uncompressedSize = view.getUint32(offset + 24, true);
+    const fileNameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
+    const fileName = decoder.decode(bytes.slice(offset + 46, offset + 46 + fileNameLength));
+
+    if (view.getUint32(localHeaderOffset, true) !== localSignature) {
+      throw new Error(`Entrada ZIP inválida: ${fileName}`);
+    }
+
+    const localFileNameLength = view.getUint16(localHeaderOffset + 26, true);
+    const localExtraLength = view.getUint16(localHeaderOffset + 28, true);
+    const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+    const dataEnd = dataStart + compressedSize;
+
+    entries.set(fileName.replace(/^\//, ""), {
+      name: fileName,
+      compressionMethod,
+      compressedSize,
+      uncompressedSize,
+      data: buffer.slice(dataStart, dataEnd),
+    });
+
+    offset += 46 + fileNameLength + extraLength + commentLength;
   }
 
-  return rows;
+  return entries;
+}
+
+async function readZipText(zip, path) {
+  const entry = zip.get(path.replace(/^\//, ""));
+  if (!entry) throw new Error(`Arquivo interno não encontrado na planilha: ${path}`);
+
+  let data;
+  if (entry.compressionMethod === 0) {
+    data = entry.data;
+  } else if (entry.compressionMethod === 8) {
+    data = await inflateRaw(entry.data);
+  } else {
+    throw new Error(`Método de compressão não suportado na planilha: ${entry.compressionMethod}`);
+  }
+
+  return new TextDecoder("utf-8").decode(data);
+}
+
+async function inflateRaw(data) {
+  try {
+    const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return await new Response(stream).arrayBuffer();
+  } catch (rawError) {
+    try {
+      const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate"));
+      return await new Response(stream).arrayBuffer();
+    } catch {
+      throw rawError;
+    }
+  }
+}
+
+function parseXml(text, label) {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  const error = doc.getElementsByTagName("parsererror")[0];
+  if (error) throw new Error(`Erro ao ler ${label}.`);
+  return doc;
+}
+
+async function readSharedStrings(zip) {
+  if (!zip.has("xl/sharedStrings.xml")) return [];
+
+  const doc = parseXml(await readZipText(zip, "xl/sharedStrings.xml"), "sharedStrings.xml");
+  return Array.from(doc.getElementsByTagName("si")).map((si) => {
+    return Array.from(si.getElementsByTagName("t")).map((node) => node.textContent || "").join("");
+  });
+}
+
+function parseWorkbookSheets(workbookDoc, relsDoc) {
+  const relMap = new Map();
+  Array.from(relsDoc.getElementsByTagName("Relationship")).forEach((rel) => {
+    const id = rel.getAttribute("Id");
+    const target = rel.getAttribute("Target") || "";
+    if (id) relMap.set(id, normalizeWorkbookTarget(target));
+  });
+
+  return Array.from(workbookDoc.getElementsByTagName("sheet")).map((sheet) => {
+    const relId = sheet.getAttribute("r:id") || sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+    return {
+      name: sheet.getAttribute("name") || "Sem nome",
+      relId,
+      path: relMap.get(relId),
+    };
+  }).filter((sheet) => sheet.path);
+}
+
+function normalizeWorkbookTarget(target) {
+  if (!target) return "";
+  if (target.startsWith("/")) return target.replace(/^\//, "");
+  const parts = (`xl/${target}`).split("/");
+  const normalized = [];
+  parts.forEach((part) => {
+    if (!part || part === ".") return;
+    if (part === "..") normalized.pop();
+    else normalized.push(part);
+  });
+  return normalized.join("/");
+}
+
+function findWorkbookSheet(sheets, candidates) {
+  const normalizedCandidates = candidates.map(normalizeHeader);
+
+  return sheets.find((sheet) => normalizedCandidates.includes(normalizeHeader(sheet.name))) ||
+    sheets.find((sheet) => normalizedCandidates.some((candidate) => normalizeHeader(sheet.name).includes(candidate)));
+}
+
+function parseWorksheetMatrix(sheetDoc, sharedStrings) {
+  const rawRows = [];
+  const rowNodes = Array.from(sheetDoc.getElementsByTagName("row"));
+
+  rowNodes.forEach((rowNode) => {
+    const excelRow = Number(rowNode.getAttribute("r"));
+    const targetRowIndex = Number.isFinite(excelRow) && excelRow > 0 ? excelRow - 1 : rawRows.length;
+    const row = rawRows[targetRowIndex] || [];
+
+    Array.from(rowNode.getElementsByTagName("c")).forEach((cell) => {
+      const reference = cell.getAttribute("r") || "";
+      const columnLetters = reference.replace(/\d+/g, "");
+      const columnIndex = columnLetters ? columnNameToIndex(columnLetters) : row.length;
+      row[columnIndex] = readCellValue(cell, sharedStrings);
+    });
+
+    rawRows[targetRowIndex] = row;
+  });
+
+  const compactRows = rawRows.filter(Boolean);
+  const maxLength = compactRows.reduce((max, row) => Math.max(max, row.length), 0);
+  return compactRows.map((row) => Array.from({ length: maxLength }, (_, index) => row[index] ?? ""));
+}
+
+function columnNameToIndex(name) {
+  return String(name || "").toUpperCase().split("").reduce((index, char) => {
+    return index * 26 + char.charCodeAt(0) - 64;
+  }, 0) - 1;
+}
+
+function readCellValue(cell, sharedStrings) {
+  const type = cell.getAttribute("t");
+  const valueNode = cell.getElementsByTagName("v")[0];
+  const rawValue = valueNode ? valueNode.textContent || "" : "";
+
+  if (type === "s") {
+    return sharedStrings[Number(rawValue)] ?? "";
+  }
+
+  if (type === "inlineStr") {
+    const inline = cell.getElementsByTagName("is")[0] || cell;
+    return Array.from(inline.getElementsByTagName("t")).map((node) => node.textContent || "").join("");
+  }
+
+  if (type === "b") return rawValue === "1" ? "TRUE" : "FALSE";
+  return rawValue;
 }
 
 function normalizeHeader(value) {
@@ -730,13 +882,6 @@ function formatKm(value) {
 function formatKmRange(start, end) {
   if (!Number.isFinite(Number(start)) && !Number.isFinite(Number(end))) return "—";
   return `${formatKm(start)} a ${formatKm(end)}`;
-}
-
-function formatPrazo(value) {
-  if (value === null || value === undefined || value === "") return "—";
-  const number = Number(value);
-  if (!Number.isFinite(number)) return escapeHtml(String(value));
-  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(number)} mês(es)`;
 }
 
 function latestDateLabel(values) {

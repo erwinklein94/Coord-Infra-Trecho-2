@@ -1,5 +1,4 @@
 {
-  "limpezaCsvUrl": "",
-  "obrasCsvUrl": "",
-  "observacao": "Quando a planilha PDM estiver online, publique as abas em CSV e cole as URLs aqui. Deixe vazio para usar os JSONs de exemplo."
+  "modo": "dashboard-local",
+  "observacao": "As URLs de planilha online foram removidas. O site usa dados de exemplo até o usuário importar uma planilha PDM local no navegador."
 }
