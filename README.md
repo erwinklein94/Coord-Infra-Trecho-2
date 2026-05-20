@@ -5,10 +5,11 @@ Site estático pronto para **GitHub Pages**, agora configurado como **dashboard 
 ## Como funciona
 
 1. Abra o site.
-2. Vá em **Fonte de dados**.
-3. Clique em **Importar planilha**.
-4. Selecione a planilha PDM atualizada em formato `.xlsx` ou `.xlsm`.
-5. O dashboard será gerado no próprio navegador.
+2. O dashboard inicia **zerado**, sem dados de exemplo preenchidos.
+3. Vá em **Fonte de dados**.
+4. Clique em **Importar planilha**.
+5. Selecione a planilha PDM atualizada em formato `.xlsx` ou `.xlsm`.
+6. O dashboard será gerado no próprio navegador.
 
 A planilha **não precisa ser publicada online** e não fica armazenada no GitHub.
 
@@ -43,8 +44,8 @@ Pontos importantes:
 
 - Não coloque a planilha real dentro do repositório do GitHub.
 - Não publique CSV, JSON ou PDF com dados sigilosos no GitHub Pages.
-- Use os arquivos `data/pdm-limpeza.json` e `data/obras-dr.json` apenas como exemplo visual.
-- Para dados reais, importe a planilha localmente pela aba **Fonte de dados**.
+- Os arquivos `data/pdm-limpeza.json` e `data/obras-dr.json` ficam vazios por padrão.
+- Para visualizar dados reais, importe a planilha localmente pela aba **Fonte de dados**.
 
 ## Compatibilidade
 
@@ -72,4 +73,4 @@ data/obras-dr.json
 data/source-config.json
 ```
 
-Gerado para o fluxo de dashboard local.
+Gerado para o fluxo de dashboard local com tela inicial zerada.

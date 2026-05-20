@@ -1,8 +1,3 @@
-const DEFAULT_FILES = {
-  limpezaJson: "data/pdm-limpeza.json",
-  obrasJson: "data/obras-dr.json",
-};
-
 const STORAGE_KEYS = {
   theme: "trecho2-pdm-theme",
 };
@@ -15,7 +10,7 @@ const TARGET_SHEETS = {
 const state = {
   limpeza: { rows: [], subSummary: [], generatedAt: null, sourceSheet: "" },
   obras: { rows: [], generatedAt: null, sourceSheet: "" },
-  sourceLabel: "Dados exemplo da planilha anexada",
+  sourceLabel: "Nenhuma planilha carregada",
   loadErrors: [],
 };
 
@@ -24,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindNavigation();
   bindFilters();
   bindSourceActions();
-  loadExampleData();
+  resetToEmptyData({ silent: true });
 });
 
 function initTheme() {
@@ -71,40 +66,47 @@ function bindFilters() {
 function bindSourceActions() {
   const fileInput = document.getElementById("pdmFileInput");
   const importButton = document.getElementById("importWorkbookBtn");
-  const resetButton = document.getElementById("resetExampleBtn");
+  const clearButton = document.getElementById("clearDataBtn");
 
-  if (!fileInput || !importButton || !resetButton) return;
+  if (!fileInput || !importButton || !clearButton) return;
 
   importButton.addEventListener("click", importSelectedWorkbook);
   fileInput.addEventListener("change", () => {
     if (fileInput.files && fileInput.files.length) importSelectedWorkbook();
   });
 
-  resetButton.addEventListener("click", () => {
+  clearButton.addEventListener("click", () => {
     fileInput.value = "";
-    loadExampleData();
-    setLoadedFileInfo("Nenhuma planilha local carregada. Usando dados de exemplo.");
+    resetToEmptyData();
   });
 }
 
-async function loadExampleData() {
+function resetToEmptyData(options = {}) {
   state.loadErrors = [];
-  showStatus("Carregando dados de exemplo do PDM...");
-
-  try {
-    state.limpeza = await fetchJson(DEFAULT_FILES.limpezaJson);
-    if (!Array.isArray(state.limpeza.subSummary) || !state.limpeza.subSummary.length) {
-      state.limpeza.subSummary = calculateSubSummary(state.limpeza.rows || []);
-    }
-
-    state.obras = await fetchJson(DEFAULT_FILES.obrasJson);
-    state.sourceLabel = "Dados exemplo da planilha anexada";
-    fillFilterOptions();
-    renderAll();
-    setLoadedFileInfo("Dados de exemplo carregados. Importe a planilha PDM atualizada para substituir esta base.");
+  state.limpeza = {
+    title: "ZBV-ZAR PDM Limpeza",
+    sourceSheet: "",
+    sourceFile: "",
+    generatedAt: null,
+    rows: [],
+    subSummary: [],
+  };
+  state.obras = {
+    title: "ZBV-ZAR Obras",
+    sourceSheet: "",
+    sourceFile: "",
+    generatedAt: null,
+    rows: [],
+  };
+  state.sourceLabel = "Nenhuma planilha carregada";
+  fillFilterOptions();
+  renderAll();
+  setLoadedFileInfo("Nenhuma planilha local carregada. O dashboard está zerado até a importação da planilha PDM.");
+  if (!options.silent) {
+    showStatus("Dados locais removidos. Importe uma planilha PDM para preencher o dashboard.");
+    setTimeout(hideStatus, 3500);
+  } else {
     hideStatus();
-  } catch (error) {
-    showStatus(`Não foi possível carregar os dados de exemplo: ${error.message}`);
   }
 }
 
@@ -167,11 +169,6 @@ function setLoadedFileInfo(message) {
   if (el) el.textContent = message;
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Não foi possível ler ${url}`);
-  return await response.json();
-}
 
 async function parsePdmWorkbook(file) {
   const buffer = await file.arrayBuffer();
@@ -619,15 +616,19 @@ function renderOverview() {
     kpiCard("Obras", String(obraRows.length), `${obrasAndamento} em andamento • ${obrasConcluidas} concluída(s)`),
   ].join("");
 
-  document.getElementById("overviewSubList").innerHTML = (state.limpeza.subSummary || [])
+  const subListHtml = (state.limpeza.subSummary || [])
     .map((sub) => compactProgressRow(`SUB ${escapeHtml(sub.sub)}`, formatPercent(sub.percentual), sub.percentual))
     .join("");
+  document.getElementById("overviewSubList").innerHTML = subListHtml ||
+    `<div class="empty-state small">Importe uma planilha PDM para visualizar as SUBs.</div>`;
 
   const statusCounts = countBy(obraRows, (row) => row.status || "NÃO INFORMADO");
-  document.getElementById("overviewObrasList").innerHTML = Object.entries(statusCounts)
+  const obrasListHtml = Object.entries(statusCounts)
     .sort((a, b) => b[1] - a[1])
     .map(([status, count]) => compactProgressRow(escapeHtml(status), `${count} obra(s)`, count / Math.max(obraRows.length, 1)))
     .join("");
+  document.getElementById("overviewObrasList").innerHTML = obrasListHtml ||
+    `<div class="empty-state small">Importe uma planilha PDM para visualizar as obras.</div>`;
 }
 
 function kpiCard(label, value, detail) {
@@ -672,7 +673,7 @@ function renderLimpeza() {
 
   const container = document.getElementById("limpezaCards");
   if (!summaries.length) {
-    container.innerHTML = `<div class="empty-state">Nenhuma SUB encontrada com os filtros atuais.</div>`;
+    container.innerHTML = `<div class="empty-state">Nenhuma SUB carregada. Importe uma planilha PDM local para preencher este dashboard.</div>`;
     return;
   }
 
@@ -765,7 +766,7 @@ function renderObras() {
 
   const container = document.getElementById("obrasCards");
   if (!rows.length) {
-    container.innerHTML = `<div class="empty-state">Nenhuma obra encontrada com os filtros atuais.</div>`;
+    container.innerHTML = `<div class="empty-state">Nenhuma obra carregada. Importe uma planilha PDM local para preencher este dashboard.</div>`;
     return;
   }
 

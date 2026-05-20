@@ -1,4 +1,4 @@
 {
   "modo": "dashboard-local",
-  "observacao": "As URLs de planilha online foram removidas. O site usa dados de exemplo até o usuário importar uma planilha PDM local no navegador."
+  "observacao": "O dashboard inicia zerado. Os dados reais aparecem apenas quando o usuário importa uma planilha PDM local no navegador."
 }
