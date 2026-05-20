@@ -10,7 +10,7 @@ Este pacote contém um site estático pronto para **GitHub Pages**, com foco na 
   - **ZBV-ZAR PDM Limpeza**
   - **ZBV-ZAR Obras**
 - Criados cards de limpeza de lastro por **SUB**.
-- Criados cards de obras com status, risco, KM, prazo, equipamento e observação.
+- Criados cards de obras com status, risco matriz, KM, prazo, equipamento e observação.
 - Adicionada tela **Fonte de dados** para conectar a planilha PDM online publicada em CSV.
 - Mantido tema claro como padrão e botão discreto de tema escuro no topo.
 

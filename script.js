@@ -630,7 +630,7 @@ function renderObras() {
 
         <div class="badge-row">
           <span class="status-badge ${statusClass(row.status)}">${escapeHtml(row.status || "NÃO INFORMADO")}</span>
-          <span class="risk-badge ${riskClass(row.risco)}">Risco: ${escapeHtml(row.risco || "—")}</span>
+          <span class="risk-badge ${riskClass(row.risco)}">Risco Matriz: ${escapeHtml(row.risco || "—")}</span>
         </div>
 
         <div class="progress" style="margin-top: 14px;">
