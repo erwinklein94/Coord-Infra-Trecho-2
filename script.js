@@ -1,3 +1,5 @@
+const APP_VERSION = "2026.05.19-2";
+
 const STORAGE_KEYS = {
   theme: "trecho2-pdm-theme",
 };
@@ -72,7 +74,10 @@ function bindSourceActions() {
 
   importButton.addEventListener("click", importSelectedWorkbook);
   fileInput.addEventListener("change", () => {
-    if (fileInput.files && fileInput.files.length) importSelectedWorkbook();
+    if (fileInput.files && fileInput.files.length) {
+      setLoadedFileInfo(`Arquivo selecionado: ${fileInput.files[0].name}. Importando...`);
+      importSelectedWorkbook();
+    }
   });
 
   clearButton.addEventListener("click", () => {
@@ -101,7 +106,7 @@ function resetToEmptyData(options = {}) {
   state.sourceLabel = "Nenhuma planilha carregada";
   fillFilterOptions();
   renderAll();
-  setLoadedFileInfo("Nenhuma planilha local carregada. O dashboard está zerado até a importação da planilha PDM.");
+  setLoadedFileInfo(`Nenhuma planilha local carregada. O dashboard está zerado até a importação da planilha PDM. Versão ${APP_VERSION}.`);
   if (!options.silent) {
     showStatus("Dados locais removidos. Importe uma planilha PDM para preencher o dashboard.");
     setTimeout(hideStatus, 3500);
@@ -130,6 +135,7 @@ async function importSelectedWorkbook() {
   }
 
   showStatus("Lendo planilha local no navegador. Nenhum arquivo será enviado para a internet...");
+  setLoadedFileInfo(`Lendo ${file.name}... aguarde.`);
 
   try {
     const workbookData = await parsePdmWorkbook(file);
@@ -155,11 +161,12 @@ async function importSelectedWorkbook() {
     state.sourceLabel = `Planilha local: ${file.name}`;
     fillFilterOptions();
     renderAll();
-    setLoadedFileInfo(`Planilha carregada: ${file.name} • Limpeza: ${workbookData.limpezaRows.length} equipamentos • Obras: ${workbookData.obrasRows.length}`);
-    showStatus("Planilha importada com sucesso. O dashboard foi atualizado localmente neste navegador.");
+    setLoadedFileInfo(`Planilha carregada: ${file.name} • Limpeza: ${workbookData.limpezaRows.length} equipamentos • Obras: ${workbookData.obrasRows.length} • Versão ${APP_VERSION}`);
+    showStatus(`Planilha importada com sucesso. Abas lidas: ${workbookData.limpezaSheetName} e ${workbookData.obrasSheetName}.`);
     setTimeout(hideStatus, 4500);
   } catch (error) {
     console.error(error);
+    setLoadedFileInfo(`Falha na importação de ${file.name}: ${error.message}`);
     showStatus(`Não foi possível importar a planilha: ${error.message}`);
   }
 }
@@ -406,15 +413,23 @@ function normalizeHeader(value) {
   return String(value || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]+/gi, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
 }
 
+function compactHeader(value) {
+  return normalizeHeader(value).replace(/\s+/g, "");
+}
+
 function findHeaderRow(matrix, requiredTerms) {
   return matrix.findIndex((row) => {
-    const normalized = row.map(normalizeHeader);
-    return requiredTerms.every((term) => normalized.includes(normalizeHeader(term)));
+    const map = headerMap(row);
+    return requiredTerms.every((term) => {
+      const aliases = Array.isArray(term) ? term : [term];
+      return getHeaderIndex(map, aliases) !== undefined;
+    });
   });
 }
 
@@ -422,47 +437,72 @@ function headerMap(row) {
   const map = {};
   row.forEach((cell, index) => {
     const key = normalizeHeader(cell);
-    if (key) map[key] = index;
+    const compact = compactHeader(cell);
+    if (key && map[key] === undefined) map[key] = index;
+    if (compact && map[compact] === undefined) map[compact] = index;
   });
   return map;
 }
 
+function getHeaderIndex(map, aliases) {
+  for (const alias of aliases) {
+    const key = normalizeHeader(alias);
+    const compact = compactHeader(alias);
+    if (map[key] !== undefined) return map[key];
+    if (map[compact] !== undefined) return map[compact];
+  }
+
+  const keys = Object.keys(map);
+  for (const alias of aliases) {
+    const key = normalizeHeader(alias);
+    const compact = compactHeader(alias);
+    const found = keys.find((mapKey) => mapKey.includes(key) || mapKey.includes(compact));
+    if (found !== undefined) return map[found];
+  }
+
+  return undefined;
+}
+
 function getByHeader(row, map, name) {
-  const index = map[normalizeHeader(name)];
+  return getByAnyHeader(row, map, [name]);
+}
+
+function getByAnyHeader(row, map, aliases) {
+  const index = getHeaderIndex(map, aliases);
   return index === undefined ? "" : row[index];
 }
 
 function normalizeLimpezaFromMatrix(matrix) {
-  const headerIndex = findHeaderRow(matrix, ["EQUIP_INFRA", "EXT", "EXT REAL"]);
+  const headerIndex = findHeaderRow(matrix, [["EQUIP_INFRA", "EQUIP INFRA", "EQUIPAMENTO INFRA"], ["EXT", "EXTENSÃO"], ["EXT REAL", "EXT REALIZADA", "EXECUTADO"]]);
   if (headerIndex < 0) throw new Error("Cabeçalho da aba de limpeza não encontrado.");
 
   const map = headerMap(matrix[headerIndex]);
   const rows = [];
 
   matrix.slice(headerIndex + 1).forEach((row, index) => {
-    const equip = String(getByHeader(row, map, "EQUIP_INFRA") || "").trim();
+    const equip = String(getByAnyHeader(row, map, ["EQUIP_INFRA", "EQUIP INFRA", "EQUIPAMENTO INFRA"]) || "").trim();
     if (!equip || !equip.includes("/")) return;
 
-    const ext = parseNumber(getByHeader(row, map, "EXT"));
-    const real = parseNumber(getByHeader(row, map, "EXT REAL"));
-    const sub = String(getByHeader(row, map, "SUB") || equip.split("/")[0] || "").trim();
+    const ext = parseNumber(getByAnyHeader(row, map, ["EXT", "EXTENSÃO", "EXTENSAO"]));
+    const real = parseNumber(getByAnyHeader(row, map, ["EXT REAL", "EXT REALIZADA", "EXT EXECUTADA", "EXECUTADO"]));
+    const sub = String(getByAnyHeader(row, map, ["SUB", "SUBDIVISÃO", "SUBDIVISAO"]) || equip.split("/")[0] || "").trim();
 
     rows.push({
       excelRow: headerIndex + index + 2,
       equipInfra: equip,
-      atividade: String(getByHeader(row, map, "ATV") || "").trim(),
-      kmi: parseInteger(getByHeader(row, map, "KMI")),
-      kmf: parseInteger(getByHeader(row, map, "KMF")),
-      kmiReal: parseInteger(getByHeader(row, map, "KMI REAL")),
-      kmfReal: parseInteger(getByHeader(row, map, "KMF REAL")),
+      atividade: String(getByAnyHeader(row, map, ["ATV", "ATIVIDADE"]) || "").trim(),
+      kmi: parseInteger(getByAnyHeader(row, map, ["KMI", "KM INICIAL"])),
+      kmf: parseInteger(getByAnyHeader(row, map, ["KMF", "KM FINAL"])),
+      kmiReal: parseInteger(getByAnyHeader(row, map, ["KMI REAL", "KM INICIAL REAL"])),
+      kmfReal: parseInteger(getByAnyHeader(row, map, ["KMF REAL", "KM FINAL REAL"])),
       ext,
       extM: `${Math.round(ext)}m`,
       extReal: real,
       extRealM: `${Math.round(real)}m`,
       percentualReal: ext ? real / ext : 0,
-      sb: cleanOptional(getByHeader(row, map, "SB")),
+      sb: cleanOptional(getByAnyHeader(row, map, ["SB", "SUBTRECHO"])),
       sub,
-      percentualSub: parseNumber(getByHeader(row, map, "%SUB")),
+      percentualSub: parseNumber(getByAnyHeader(row, map, ["%SUB", "PERCENTUAL SUB"])),
     });
   });
 
@@ -470,7 +510,7 @@ function normalizeLimpezaFromMatrix(matrix) {
 }
 
 function normalizeObrasFromMatrix(matrix) {
-  const headerIndex = findHeaderRow(matrix, ["SUB", "DESCRIÇÃO OBRA", "STATUS"]);
+  const headerIndex = findHeaderRow(matrix, [["SUB", "SUBDIVISÃO", "SUBDIVISAO"], ["DESCRIÇÃO OBRA", "DESCRICAO OBRA", "DESCRIÇÃO DA OBRA", "OBRA"], ["STATUS", "SITUAÇÃO", "SITUACAO"]]);
   if (headerIndex < 0) throw new Error("Cabeçalho da aba de obras não encontrado.");
 
   const map = headerMap(matrix[headerIndex]);
@@ -478,30 +518,30 @@ function normalizeObrasFromMatrix(matrix) {
   let currentSub = "";
 
   matrix.slice(headerIndex + 1).forEach((row, index) => {
-    const maybeSub = cleanOptional(getByHeader(row, map, "SUB"));
+    const maybeSub = cleanOptional(getByAnyHeader(row, map, ["SUB", "SUBDIVISÃO", "SUBDIVISAO"]));
     if (maybeSub) currentSub = maybeSub;
 
-    const descricao = cleanOptional(getByHeader(row, map, "DESCRIÇÃO OBRA"));
+    const descricao = cleanOptional(getByAnyHeader(row, map, ["DESCRIÇÃO OBRA", "DESCRICAO OBRA", "DESCRIÇÃO DA OBRA", "OBRA"]));
     if (!descricao || descricao.toLowerCase().includes("plano de drenagem")) return;
 
-    const status = cleanOptional(getByHeader(row, map, "STATUS")) || "NÃO INFORMADO";
+    const status = cleanOptional(getByAnyHeader(row, map, ["STATUS", "SITUAÇÃO", "SITUACAO"])) || "NÃO INFORMADO";
     rows.push({
       excelRow: headerIndex + index + 2,
       sub: currentSub,
-      sb: cleanOptional(getByHeader(row, map, "SB")),
-      km: parseInteger(getByHeader(row, map, "KM")),
+      sb: cleanOptional(getByAnyHeader(row, map, ["SB", "SUBTRECHO"])),
+      km: parseInteger(getByAnyHeader(row, map, ["KM", "KILOMETRO", "QUILÔMETRO", "QUILOMETRO"])),
       descricao,
-      tipoObra: cleanOptional(getByHeader(row, map, "TIPO DE OBRA")),
-      risco: cleanOptional(getByHeader(row, map, "RISCO")),
-      motivo: cleanOptional(getByHeader(row, map, "MOTIVO")),
-      equipamento: cleanOptional(getByHeader(row, map, "EQUIPAMENTO")),
-      extEq: parseNullableNumber(getByHeader(row, map, "EXT EQ.")),
-      extEqM: cleanOptional(getByHeader(row, map, "EXT EQ.(M)")),
-      prazoMes: parseNullableNumber(getByHeader(row, map, "PRAZO (MÊS)")),
-      dtInicio: cleanOptional(getByHeader(row, map, "DT INÍCIO")),
+      tipoObra: cleanOptional(getByAnyHeader(row, map, ["TIPO DE OBRA", "TIPO OBRA"])),
+      risco: cleanOptional(getByAnyHeader(row, map, ["RISCO", "RISCO MATRIZ", "MATRIZ DE RISCO"])),
+      motivo: cleanOptional(getByAnyHeader(row, map, ["MOTIVO", "JUSTIFICATIVA"])),
+      equipamento: cleanOptional(getByAnyHeader(row, map, ["EQUIPAMENTO", "EQUIP_INFRA", "EQUIP INFRA"])),
+      extEq: parseNullableNumber(getByAnyHeader(row, map, ["EXT EQ.", "EXT EQ", "EXTENSÃO EQ", "EXTENSAO EQ"])),
+      extEqM: cleanOptional(getByAnyHeader(row, map, ["EXT EQ.(M)", "EXT EQ M", "EXTENSÃO EQ M", "EXTENSAO EQ M"])),
+      prazoMes: parseNullableNumber(getByAnyHeader(row, map, ["PRAZO (MÊS)", "PRAZO MES", "PRAZO"])),
+      dtInicio: cleanOptional(getByAnyHeader(row, map, ["DT INÍCIO", "DT INICIO", "DATA INÍCIO", "DATA INICIO"])),
       status,
       progresso: statusToProgress(status),
-      obs: cleanOptional(getByHeader(row, map, "OBS.")),
+      obs: cleanOptional(getByAnyHeader(row, map, ["OBS.", "OBS", "OBSERVAÇÃO", "OBSERVACAO"])),
     });
   });
 
