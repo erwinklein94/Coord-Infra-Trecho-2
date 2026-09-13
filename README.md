@@ -35,6 +35,10 @@ A estrutura das colunas deve seguir a planilha usada como modelo neste projeto.
   - SUB, KM, status, risco matriz, tipo, equipamento, extensão, motivo e observação
 - **Fonte de dados**
   - Importação local da planilha PDM
+- **Modo apresentação** (botão ao lado de "Fonte de dados")
+  - Abre o dashboard em tela cheia, sem a aba de importação e sem rodapé
+  - Setas `←` `→` alternam entre Visão geral, Limpeza Geral e Obras
+  - `Esc` ou o botão "Sair da apresentação" voltam ao modo normal
 
 ## Segurança dos dados
 

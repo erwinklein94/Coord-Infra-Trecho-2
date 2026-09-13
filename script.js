@@ -1,4 +1,4 @@
-const APP_VERSION = "2026.05.19-2";
+const APP_VERSION = "2026.09.13-1";
 
 const STORAGE_KEYS = {
   theme: "trecho2-pdm-theme",
@@ -19,6 +19,7 @@ const state = {
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   bindNavigation();
+  bindPresentationMode();
   bindFilters();
   bindSourceActions();
   resetToEmptyData({ silent: true });
@@ -45,14 +46,108 @@ function updateThemeButton() {
 
 function bindNavigation() {
   document.querySelectorAll(".tab").forEach((button) => {
-    button.addEventListener("click", () => {
-      const panel = button.dataset.panel;
-      document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab === button));
-      document.querySelectorAll(".panel").forEach((section) => {
-        section.classList.toggle("active", section.id === `panel-${panel}`);
-      });
-    });
+    button.addEventListener("click", () => activatePanel(button.dataset.panel));
   });
+}
+
+function activatePanel(panel) {
+  document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.panel === panel));
+  document.querySelectorAll(".panel").forEach((section) => {
+    section.classList.toggle("active", section.id === `panel-${panel}`);
+  });
+}
+
+// Painel de importação não faz sentido durante a apresentação.
+const PRESENTATION_HIDDEN_PANEL = "dados";
+let presentationHintTimer = null;
+
+function bindPresentationMode() {
+  const button = document.getElementById("presentationToggle");
+  if (!button) return;
+
+  button.addEventListener("click", () => {
+    if (isPresenting()) exitPresentation();
+    else enterPresentation();
+  });
+
+  // Esc/F11 saem da tela cheia pelo navegador: sincroniza o layout.
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && isPresenting()) setPresentationState(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!isPresenting() || event.target.closest("input, select, textarea")) return;
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      stepPresentationPanel(1);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      stepPresentationPanel(-1);
+    } else if (event.key === "Escape") {
+      exitPresentation();
+    }
+  });
+}
+
+function isPresenting() {
+  return document.body.classList.contains("presentation");
+}
+
+function enterPresentation() {
+  const activeTab = document.querySelector(".tab.active");
+  if (!activeTab || activeTab.dataset.panel === PRESENTATION_HIDDEN_PANEL) activatePanel("overview");
+
+  setPresentationState(true);
+  window.scrollTo(0, 0);
+
+  const root = document.documentElement;
+  if (root.requestFullscreen && !document.fullscreenElement) {
+    root.requestFullscreen().catch((error) => {
+      console.warn("Tela cheia indisponível neste navegador:", error);
+    });
+  }
+
+  showPresentationHint();
+}
+
+function exitPresentation() {
+  setPresentationState(false);
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+function setPresentationState(active) {
+  document.body.classList.toggle("presentation", active);
+
+  const button = document.getElementById("presentationToggle");
+  button.setAttribute("aria-pressed", String(active));
+  button.title = active ? "Sair do modo apresentação (Esc)" : "Abrir o dashboard em tela cheia";
+  document.getElementById("presentationToggleText").textContent = active ? "Sair da apresentação" : "Modo apresentação";
+
+  if (!active) hidePresentationHint();
+}
+
+function stepPresentationPanel(direction) {
+  const tabs = Array.from(document.querySelectorAll(".tab")).filter((tab) => tab.dataset.panel !== PRESENTATION_HIDDEN_PANEL);
+  const current = tabs.findIndex((tab) => tab.classList.contains("active"));
+  const next = tabs[(current + direction + tabs.length) % tabs.length];
+  activatePanel(next.dataset.panel);
+  window.scrollTo(0, 0);
+}
+
+function showPresentationHint() {
+  const hint = document.getElementById("presentationHint");
+  if (!hint) return;
+  hint.classList.add("show");
+  clearTimeout(presentationHintTimer);
+  presentationHintTimer = setTimeout(hidePresentationHint, 4000);
+}
+
+function hidePresentationHint() {
+  clearTimeout(presentationHintTimer);
+  document.getElementById("presentationHint")?.classList.remove("show");
 }
 
 function bindFilters() {

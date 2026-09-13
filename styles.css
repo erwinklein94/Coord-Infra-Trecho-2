@@ -1074,6 +1074,109 @@ body.dark .logo-on-dark {
 }
 
 /* =====================================================================
+   MODO APRESENTAÇÃO — tela cheia, sem importação nem rodapé
+   ===================================================================== */
+.present-btn {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 7px;
+  height: 30px;
+  margin-left: 10px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.present-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.present-btn svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--rumo-verde-claro);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.present-btn .icon-exit,
+body.presentation .present-btn .icon-enter {
+  display: none;
+}
+
+body.presentation .present-btn .icon-exit {
+  display: block;
+}
+
+body.presentation .present-btn {
+  border-color: var(--rumo-verde-claro);
+  background: var(--rumo-verde-claro);
+  color: var(--rumo-azul);
+}
+
+body.presentation .present-btn svg {
+  stroke: var(--rumo-azul);
+}
+
+body.presentation .tab[data-panel="dados"],
+body.presentation .site-footer {
+  display: none;
+}
+
+body.presentation main {
+  width: calc(100% - 48px);
+  padding-bottom: 24px;
+}
+
+.presentation-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 30, 54, 0.94);
+  color: #ffffff;
+  font-size: 12.5px;
+  box-shadow: 0 8px 24px rgba(0, 30, 54, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.presentation-hint.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.presentation-hint kbd {
+  min-width: 22px;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* =====================================================================
    RESPONSIVO
    ===================================================================== */
 @media (max-width: 1100px) {

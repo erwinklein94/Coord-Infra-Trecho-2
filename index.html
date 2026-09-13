@@ -6,7 +6,7 @@
   <title>Trecho 2 | Dashboard PDM Infraestrutura</title>
   <meta name="description" content="Dashboard PDM Trecho 2 para acompanhamento de limpeza de lastro e obras de infraestrutura ferroviária." />
   <meta name="theme-color" content="#003865" />
-  <link rel="stylesheet" href="styles.css?v=20260913-1" />
+  <link rel="stylesheet" href="styles.css?v=20260913-2" />
 </head>
 <body>
   <header class="site-header">
@@ -24,6 +24,11 @@
       <button class="tab" type="button" data-panel="limpeza">Limpeza Geral</button>
       <button class="tab" type="button" data-panel="obras">Obras</button>
       <button class="tab" type="button" data-panel="dados">Fonte de dados</button>
+      <button class="present-btn" id="presentationToggle" type="button" aria-pressed="false" title="Abrir o dashboard em tela cheia">
+        <svg class="icon-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        <svg class="icon-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+        <span id="presentationToggleText">Modo apresentação</span>
+      </button>
     </nav>
 
     <div class="header-actions">
@@ -191,6 +196,10 @@
     </div>
   </footer>
 
-  <script src="script.js?v=20260519-2"></script>
+  <div class="presentation-hint" id="presentationHint" role="status" aria-live="polite">
+    <kbd>←</kbd><kbd>→</kbd> navegar entre painéis <span aria-hidden="true">•</span> <kbd>Esc</kbd> sair
+  </div>
+
+  <script src="script.js?v=20260913-1"></script>
 </body>
 </html>
