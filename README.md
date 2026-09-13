@@ -30,6 +30,8 @@ A estrutura das colunas deve seguir a planilha usada como modelo neste projeto.
   - Saldo a executar por SUB, frentes por situação e limpeza por tipo de seção (corte, aterro, seção mista)
   - Matriz risco × situação das obras e obras por SUB
   - Cada gráfico tem tooltip e botão "Ver tabela" com os mesmos números
+  - Clique em qualquer gráfico (com ou sem modo apresentação) para abri-lo em destaque: indicadores-resumo, gráfico ampliado, lista detalhada de frentes/obras e tabela resumo
+  - No destaque, clicar em uma barra, faixa ou célula filtra a lista; `←` `→` ou Anterior/Próximo trocam de gráfico; `Esc` fecha
 - **Limpeza Geral**
   - Cards por SUB
   - Percentual por SUB

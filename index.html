@@ -6,7 +6,7 @@
   <title>Trecho 2 | Dashboard PDM Infraestrutura</title>
   <meta name="description" content="Dashboard PDM Trecho 2 para acompanhamento de limpeza de lastro e obras de infraestrutura ferroviária." />
   <meta name="theme-color" content="#003865" />
-  <link rel="stylesheet" href="styles.css?v=20260913-3" />
+  <link rel="stylesheet" href="styles.css?v=20260913-4" />
 </head>
 <body>
   <header class="site-header">
@@ -198,10 +198,35 @@
     </div>
   </footer>
 
+  <dialog class="chart-modal" id="chartModal" aria-labelledby="chartModalTitle">
+    <div class="chart-modal-panel">
+      <header class="chart-modal-head">
+        <div>
+          <span class="eyebrow" id="chartModalEyebrow"></span>
+          <h2 id="chartModalTitle"></h2>
+          <p class="chart-note" id="chartModalNote"></p>
+        </div>
+        <div class="chart-modal-actions">
+          <span class="chart-modal-count" id="chartModalCount"></span>
+          <button class="modal-nav" type="button" data-modal-step="-1" aria-label="Gráfico anterior">
+            <span aria-hidden="true">‹</span><span class="modal-nav-text">Anterior</span>
+          </button>
+          <button class="modal-nav" type="button" data-modal-step="1" aria-label="Próximo gráfico">
+            <span class="modal-nav-text">Próximo</span><span aria-hidden="true">›</span>
+          </button>
+          <button class="modal-close" type="button" aria-label="Fechar gráfico em destaque">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+      </header>
+      <div class="chart-modal-body" id="chartModalBody"></div>
+    </div>
+  </dialog>
+
   <div class="presentation-hint" id="presentationHint" role="status" aria-live="polite">
     <kbd>←</kbd><kbd>→</kbd> navegar entre painéis <span aria-hidden="true">•</span> <kbd>Esc</kbd> sair
   </div>
 
-  <script src="script.js?v=20260913-2"></script>
+  <script src="script.js?v=20260913-3"></script>
 </body>
 </html>
