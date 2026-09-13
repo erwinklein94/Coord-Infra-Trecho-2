@@ -45,6 +45,22 @@ As cores, a fonte e a forma ficam centralizadas em variáveis `--rumo-*` no topo
 - **Grades automáticas:** limpeza a partir de 360px por card e obras a partir de 280px. Em uma tela de 1600px ficam 4 colunas de limpeza e 5 de obras. Em 1920px ficam 6 colunas de obras.
 - **Espaçamentos e controles:** campos e botões com 32px de altura e espaçamentos internos menores.
 
+## Gráficos da Visão geral
+
+| Papel | Cor | Onde |
+|---|---|---|
+| Concluído / executado | Verde `#1E9F7F` | Mapa linear, frentes por situação, obras por SUB |
+| Em andamento | Amarelo `#FBD300` | Frentes por situação, obras por SUB |
+| Pendente / não iniciado / a executar | Cinza `#BDCCD4` (no tema escuro, misturado ao azul profundo) | Mapa linear, frentes, obras |
+| Magnitude | Azul `#003865` (azul claro `#32A6E6` no tema escuro) | Saldo por SUB, parte executada no gráfico por tipo de seção, matriz risco × situação |
+| Planejado (trilho) | Azul claro a 24% | Gráfico por tipo de seção |
+
+Resultado do validador de paleta com as três cores de status lado a lado:
+
+- **Diferença para daltonismo:** ΔE 19,0 no tema claro e 23,6 no escuro, acima da meta de 8.
+- **Visão normal:** ΔE 19,8 no claro e 31,0 no escuro, acima do mínimo de 15.
+- **Contraste:** amarelo (1,46:1) e cinza (1,65:1) ficam abaixo de 3:1 sobre branco, o que é esperado para cores de status. Por isso todo gráfico tem legenda, valor escrito na ponta da barra, tooltip e botão "Ver tabela" com os mesmos números. No tema escuro as três cores passam de 3:1.
+
 ## Acessibilidade
 
 - Texto sobre o azul `#003865` é sempre branco.

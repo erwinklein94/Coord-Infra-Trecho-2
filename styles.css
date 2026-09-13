@@ -1074,6 +1074,510 @@ body.dark .logo-on-dark {
 }
 
 /* =====================================================================
+   GRÁFICOS DA VISÃO GERAL
+   Status: verde = concluído, amarelo = em andamento, cinza = pendente.
+   Magnitude: azul institucional (claro no tema escuro).
+   ===================================================================== */
+:root {
+  --status-done: var(--rumo-verde);
+  --status-progress: var(--rumo-amarelo);
+  --status-pending: var(--rumo-cinza);
+  --chart-primary: var(--rumo-azul);
+  --chart-track: color-mix(in srgb, var(--rumo-azul-claro) 24%, #ffffff);
+  --chart-grid: var(--rumo-cinza-100);
+  --heat-base: var(--rumo-azul);
+}
+
+body.dark {
+  --status-pending: color-mix(in srgb, var(--rumo-cinza) 50%, var(--rumo-azul-profundo));
+  --chart-primary: var(--rumo-azul-claro);
+  --chart-track: color-mix(in srgb, var(--rumo-azul-claro) 24%, var(--rumo-azul-profundo));
+  --chart-grid: rgba(189, 204, 212, 0.16);
+  --heat-base: var(--rumo-azul-claro);
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.charts-grid:empty {
+  display: none;
+}
+
+.chart-card {
+  min-width: 0;
+}
+
+.chart-card.span-12 {
+  grid-column: span 12;
+}
+
+.chart-card.span-6 {
+  grid-column: span 6;
+}
+
+.chart-card.span-4 {
+  grid-column: span 4;
+}
+
+.chart-note {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.chart-view-toggle {
+  flex: none;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--navy);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: border-color var(--transition);
+}
+
+.chart-view-toggle:hover {
+  border-color: var(--navy);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: -2px 0 10px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.tone-concluido {
+  background: var(--status-done);
+}
+
+.tone-andamento {
+  background: var(--status-progress);
+}
+
+.tone-pendente {
+  background: var(--status-pending);
+}
+
+.tone-primary {
+  background: var(--chart-primary);
+}
+
+.tone-track {
+  background: var(--chart-track);
+}
+
+/* ---- Barras horizontais: marca fina, ponta arredondada, rótulo na ponta ---- */
+.bar-list {
+  display: grid;
+  gap: 2px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+
+.bar-row[tabindex]:hover,
+.bar-row:focus-visible {
+  background: var(--surface-2);
+}
+
+.bar-list-wide .bar-row {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+.bar-label {
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bar-line {
+  --label-room: 132px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bar-list-wide .bar-line {
+  --label-room: 176px;
+}
+
+.bar,
+.stack,
+.bullet {
+  flex: none;
+  height: 14px;
+  width: calc((100% - var(--label-room)) * var(--t));
+}
+
+.bar,
+.bullet,
+.bullet-fill {
+  border-radius: 0 4px 4px 0;
+}
+
+.bar:not(.is-empty) {
+  min-width: 2px;
+}
+
+.bullet-fill {
+  display: block;
+  width: calc(var(--f) * 100%);
+  height: 100%;
+}
+
+.stack {
+  display: flex;
+  gap: 2px;
+}
+
+.stack .seg {
+  position: relative;
+  flex: var(--n) 1 0%;
+  min-width: 3px;
+  height: 100%;
+  transition: filter var(--transition);
+}
+
+.stack .seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+/* área de toque maior que a marca */
+.stack .seg::after {
+  content: "";
+  position: absolute;
+  inset: -7px -1px;
+}
+
+.stack .seg:hover,
+.stack .seg:focus-visible {
+  filter: brightness(1.08) saturate(1.1);
+}
+
+.stack .seg:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 1px;
+}
+
+.bar-value {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-value strong {
+  margin-right: 3px;
+  color: var(--navy);
+}
+
+/* ---- Mapa linear (unifilar) ---- */
+.linemap {
+  display: grid;
+}
+
+.lm-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 170px;
+  align-items: center;
+  gap: 14px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--chart-grid);
+}
+
+.lm-row:last-child {
+  border-bottom: 0;
+}
+
+.lm-label strong,
+.lm-value strong {
+  display: block;
+  color: var(--navy);
+  font-size: 12.5px;
+}
+
+.lm-label span,
+.lm-value span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-value {
+  text-align: right;
+}
+
+.lm-track {
+  position: relative;
+  height: 24px;
+  background: linear-gradient(var(--border-strong), var(--border-strong)) center / 100% 1px no-repeat;
+  cursor: crosshair;
+}
+
+.lm-seg,
+.lm-done {
+  position: absolute;
+  top: 6px;
+  height: 12px;
+  min-width: 2px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.lm-seg {
+  background: var(--status-pending);
+}
+
+.lm-done {
+  background: var(--status-done);
+}
+
+.lm-seg.is-hover,
+.lm-done.is-hover {
+  z-index: 1;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--navy);
+}
+
+/* ---- Matriz risco × situação ---- */
+.heat-wrap {
+  margin-top: 0;
+  border: 0;
+}
+
+.heat-table {
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 3px;
+  background: transparent;
+}
+
+.heat-table th,
+.heat-table td {
+  padding: 8px;
+  border-bottom: 0;
+  text-align: center;
+  font-size: 12.5px;
+}
+
+.heat-table thead th {
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.heat-table tbody th,
+.heat-table tfoot th {
+  background: transparent;
+  color: var(--navy);
+  font-size: 12px;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.heat-cell {
+  border-radius: 4px;
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-cell[tabindex]:hover,
+.heat-cell:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: -2px;
+}
+
+.heat-0 {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.heat-1 {
+  background: color-mix(in srgb, var(--heat-base) 12%, var(--surface));
+}
+
+.heat-2 {
+  background: color-mix(in srgb, var(--heat-base) 26%, var(--surface));
+}
+
+.heat-3 {
+  background: color-mix(in srgb, var(--heat-base) 42%, var(--surface));
+}
+
+.heat-4 {
+  background: color-mix(in srgb, var(--heat-base) 80%, var(--surface));
+  color: #ffffff;
+}
+
+body.dark .heat-1 {
+  background: color-mix(in srgb, var(--heat-base) 14%, var(--surface));
+}
+
+body.dark .heat-2 {
+  background: color-mix(in srgb, var(--heat-base) 28%, var(--surface));
+}
+
+body.dark .heat-3 {
+  background: color-mix(in srgb, var(--heat-base) 45%, var(--surface));
+  color: #ffffff;
+}
+
+body.dark .heat-4 {
+  background: var(--heat-base);
+  color: var(--rumo-azul-noite);
+}
+
+.heat-total {
+  color: var(--navy);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Tabela equivalente de cada gráfico ---- */
+.chart-table {
+  display: none;
+  max-height: 380px;
+  margin-top: 0;
+}
+
+.chart-card.show-table .chart-table {
+  display: block;
+}
+
+.chart-card.show-table .chart-view {
+  display: none;
+}
+
+.chart-table table {
+  min-width: 0;
+}
+
+.chart-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.chart-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Tooltip ---- */
+.chart-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  display: grid;
+  gap: 1px;
+  max-width: 300px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgba(0, 30, 54, 0.18);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.chart-tooltip.show {
+  opacity: 1;
+}
+
+.chart-tooltip strong {
+  color: var(--navy);
+  font-size: 13px;
+}
+
+.chart-tooltip small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (max-width: 1400px) {
+  .chart-card.span-4 {
+    grid-column: span 6;
+  }
+
+  .chart-card.wide-on-medium {
+    grid-column: span 12;
+  }
+}
+
+@media (max-width: 1100px) {
+  .chart-card.span-4,
+  .chart-card.span-6,
+  .chart-card.wide-on-medium {
+    grid-column: span 12;
+  }
+}
+
+@media (max-width: 640px) {
+  .lm-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+  }
+
+  .lm-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .bar-line {
+    --label-room: 132px;
+  }
+
+  /* rótulo longo desce para a linha de baixo em vez de espremer a barra */
+  .bar-list-wide .bar-line {
+    --label-room: 0px;
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding: 4px 0;
+  }
+}
+
+/* =====================================================================
    MODO APRESENTAÇÃO — tela cheia, sem importação nem rodapé
    ===================================================================== */
 .present-btn {

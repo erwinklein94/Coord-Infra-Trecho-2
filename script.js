@@ -1,4 +1,4 @@
-const APP_VERSION = "2026.09.13-1";
+const APP_VERSION = "2026.09.13-2";
 
 const STORAGE_KEYS = {
   theme: "trecho2-pdm-theme",
@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   bindNavigation();
   bindPresentationMode();
+  bindChartInteractions();
   bindFilters();
   bindSourceActions();
   resetToEmptyData({ silent: true });
@@ -764,6 +765,8 @@ function renderOverview() {
     .join("");
   document.getElementById("overviewObrasList").innerHTML = obrasListHtml ||
     `<div class="empty-state small">Importe uma planilha PDM para visualizar as obras.</div>`;
+
+  renderOverviewCharts();
 }
 
 function kpiCard(label, value, detail) {
@@ -786,6 +789,531 @@ function compactProgressRow(label, value, pct) {
       <strong>${value}</strong>
     </div>
   `;
+}
+
+// ===== Gráficos da visão geral =====
+
+const ACTIVITY_LABELS = { CT: "Corte", AT: "Aterro", SM: "Seção mista" };
+const RISK_ORDER = ["Alto", "Moderado", "Baixo"];
+const LIMPEZA_STATUS_SERIES = [
+  { key: "concluido", label: "Concluídas" },
+  { key: "andamento", label: "Em andamento" },
+  { key: "pendente", label: "Pendentes" },
+];
+const OBRA_STATUS_SERIES = [
+  { key: "concluido", label: "Concluída" },
+  { key: "andamento", label: "Em andamento" },
+  { key: "pendente", label: "Não iniciada" },
+];
+
+// Segmentos do mapa linear por SUB, usados para achar a frente mais próxima do ponteiro.
+let linemapData = new Map();
+
+function renderOverviewCharts() {
+  const container = document.getElementById("overviewCharts");
+  if (!container) return;
+
+  const limpezaRows = state.limpeza.rows || [];
+  const obraRows = state.obras.rows || [];
+  hideChartTooltip();
+  linemapData = new Map();
+
+  container.innerHTML = [
+    limpezaRows.length ? linemapChart(limpezaRows) : "",
+    limpezaRows.length ? saldoChart(state.limpeza.subSummary || []) : "",
+    limpezaRows.length ? frentesChart(limpezaRows) : "",
+    limpezaRows.length ? activityChart(limpezaRows) : "",
+    obraRows.length ? riskStatusChart(obraRows) : "",
+    obraRows.length ? obrasPorSubChart(obraRows) : "",
+  ].join("");
+}
+
+function linemapChart(rows) {
+  const groups = groupRows(rows, (row) => String(row.sub || "Sem SUB"));
+  const tableRows = [];
+
+  const lines = Array.from(groups.keys()).sort(sortNumericText).map((sub) => {
+    const items = groups.get(sub);
+    const segments = items
+      .filter((row) => Number.isFinite(row.kmi) && Number.isFinite(row.kmf))
+      .map((row) => ({
+        row,
+        start: Math.min(row.kmi, row.kmf),
+        end: Math.max(row.kmi, row.kmf),
+        done: executedRange(row),
+      }));
+    if (!segments.length) return "";
+
+    const start = Math.min(...segments.map((segment) => (segment.done ? Math.min(segment.start, segment.done[0]) : segment.start)));
+    const end = Math.max(...segments.map((segment) => (segment.done ? Math.max(segment.end, segment.done[1]) : segment.end)));
+    const span = Math.max(end - start, 1);
+    const position = (km) => ((km - start) / span) * 100;
+    linemapData.set(sub, { start, span, segments });
+
+    const marks = segments.map((segment, index) => {
+      const { row } = segment;
+      tableRows.push([
+        `SUB ${sub}`,
+        row.equipInfra || "Sem código",
+        activityLabel(row.atividade),
+        formatKmRange(row.kmi, row.kmf),
+        formatMeters(row.ext),
+        formatMeters(row.extReal),
+        formatRatio(ratio(row.extReal, row.ext)),
+      ]);
+
+      const plannedMark = `<span class="lm-seg" data-i="${index}" style="left:${position(segment.start)}%;width:${position(segment.end) - position(segment.start)}%"></span>`;
+      const doneMark = segment.done
+        ? `<span class="lm-done" data-i="${index}" style="left:${position(segment.done[0])}%;width:${position(segment.done[1]) - position(segment.done[0])}%"></span>`
+        : "";
+      return plannedMark + doneMark;
+    }).join("");
+
+    const planned = sum(items, "ext");
+    const executed = sum(items, "extReal");
+    const executedLabel = formatRatio(ratio(executed, planned));
+
+    return `
+      <div class="lm-row">
+        <div class="lm-label">
+          <strong>SUB ${escapeHtml(sub)}</strong>
+          <span>km ${formatKm(start)} – ${formatKm(end)}</span>
+        </div>
+        <div class="lm-track" data-sub="${escapeAttribute(sub)}" role="img" aria-label="${escapeAttribute(`SUB ${sub}: ${executedLabel} executado`)}">${marks}</div>
+        <div class="lm-value">
+          <strong>${executedLabel}</strong>
+          <span>${formatLength(executed)} de ${formatLength(planned)}</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return chartCard({
+    span: 12,
+    eyebrow: "Limpeza Geral",
+    title: "Mapa linear das frentes por SUB",
+    note: "Posição de cada frente ao longo do km. Cada linha usa a escala de km da própria SUB.",
+    legend: chartLegend([{ tone: "concluido", label: "Executado" }, { tone: "pendente", label: "A executar" }]),
+    body: `<div class="linemap">${lines}</div>`,
+    table: simpleTable(["SUB", "Equipamento", "ATV", "KM", "Planejado", "Executado", "%"], tableRows, 4),
+  });
+}
+
+function executedRange(row) {
+  if (!(row.extReal > 0)) return null;
+  if (Number.isFinite(row.kmiReal) && Number.isFinite(row.kmfReal)) {
+    return [Math.min(row.kmiReal, row.kmfReal), Math.max(row.kmiReal, row.kmfReal)];
+  }
+  const start = Math.min(row.kmi, row.kmf);
+  return [start, Math.min(start + row.extReal, Math.max(row.kmi, row.kmf))];
+}
+
+function saldoChart(summaries) {
+  const items = summaries.slice().sort((a, b) => b.saldoM - a.saldoM);
+  const max = Math.max(0, ...items.map((item) => item.saldoM));
+
+  const body = `<div class="bar-list">${items.map((item) => `
+    <div class="bar-row" tabindex="0" ${tipAttributes({
+      value: `${formatMeters(item.saldoM)} a executar`,
+      label: `SUB ${item.sub}`,
+      detail: `Planejado ${formatMeters(item.planejadoM)} • executado ${formatMeters(item.realizadoM)} (${formatRatio(ratio(item.realizadoM, item.planejadoM))})`,
+    })}>
+      <span class="bar-label">SUB ${escapeHtml(item.sub)}</span>
+      <span class="bar-line">
+        <span class="bar tone-primary${item.saldoM > 0 ? "" : " is-empty"}" style="--t:${ratio(item.saldoM, max)}"></span>
+        <span class="bar-value"><strong>${formatLength(item.saldoM)}</strong></span>
+      </span>
+    </div>
+  `).join("")}</div>`;
+
+  return chartCard({
+    span: 4,
+    eyebrow: "Limpeza Geral",
+    title: "Saldo a executar por SUB",
+    note: "Metros restantes, do maior para o menor saldo",
+    body,
+    table: simpleTable(
+      ["SUB", "Planejado", "Executado", "Saldo"],
+      items.map((item) => [`SUB ${item.sub}`, formatMeters(item.planejadoM), formatMeters(item.realizadoM), formatMeters(item.saldoM)])
+    ),
+  });
+}
+
+function frentesChart(rows) {
+  const items = statusBreakdown(rows, (row) => String(row.sub || "Sem SUB"), limpezaStatus);
+  const max = Math.max(0, ...items.map((item) => item.total));
+
+  const body = stackedBars(
+    items,
+    LIMPEZA_STATUS_SERIES,
+    max,
+    (item) => `<strong>${item.counts.concluido}/${item.total}</strong> concluídas`,
+    (item, series, count) => ({
+      value: `${count} de ${item.total} frentes`,
+      label: `SUB ${item.key} • ${series.label}`,
+      detail: `${formatRatio(ratio(count, item.total))} das frentes da SUB`,
+    })
+  );
+
+  return chartCard({
+    span: 4,
+    eyebrow: "Limpeza Geral",
+    title: "Frentes por situação",
+    note: "Quantidade de equipamentos em cada situação, por SUB",
+    legend: chartLegend(LIMPEZA_STATUS_SERIES.map((series) => ({ tone: series.key, label: series.label }))),
+    body,
+    table: simpleTable(
+      ["SUB", ...LIMPEZA_STATUS_SERIES.map((series) => series.label), "Total"],
+      items.map((item) => [`SUB ${item.key}`, ...LIMPEZA_STATUS_SERIES.map((series) => String(item.counts[series.key])), String(item.total)])
+    ),
+  });
+}
+
+function activityChart(rows) {
+  const groups = groupRows(rows, (row) => activityLabel(row.atividade));
+  const items = Array.from(groups.entries())
+    .map(([label, list]) => ({ label, count: list.length, planned: sum(list, "ext"), executed: sum(list, "extReal") }))
+    .sort((a, b) => b.planned - a.planned);
+  const max = Math.max(0, ...items.map((item) => Math.max(item.planned, item.executed)));
+
+  const body = `<div class="bar-list bar-list-wide">${items.map((item) => {
+    const done = ratio(item.executed, item.planned);
+    return `
+      <div class="bar-row" tabindex="0" ${tipAttributes({
+        value: `${formatMeters(item.executed)} de ${formatMeters(item.planned)}`,
+        label: item.label,
+        detail: `${formatRatio(done)} executado • ${item.count} frente(s)`,
+      })}>
+        <span class="bar-label">${escapeHtml(item.label)}</span>
+        <span class="bar-line">
+          <span class="bullet tone-track" style="--t:${ratio(item.planned, max)}"><span class="bullet-fill tone-primary" style="--f:${Math.min(done, 1)}"></span></span>
+          <span class="bar-value"><strong>${formatRatio(done)}</strong> ${formatLength(item.executed)} de ${formatLength(item.planned)}</span>
+        </span>
+      </div>
+    `;
+  }).join("")}</div>`;
+
+  return chartCard({
+    span: 4,
+    className: "wide-on-medium",
+    eyebrow: "Limpeza Geral",
+    title: "Limpeza por tipo de seção",
+    note: "Executado sobre o planejado em corte, aterro e seção mista",
+    legend: chartLegend([{ tone: "track", label: "Planejado" }, { tone: "primary", label: "Executado" }]),
+    body,
+    table: simpleTable(
+      ["Tipo de seção", "Frentes", "Planejado", "Executado", "%"],
+      items.map((item) => [item.label, String(item.count), formatMeters(item.planned), formatMeters(item.executed), formatRatio(ratio(item.executed, item.planned))])
+    ),
+  });
+}
+
+function riskStatusChart(rows) {
+  const columns = OBRA_STATUS_SERIES.slice().reverse();
+  const groups = groupRows(rows, riskLabel);
+  const risks = Array.from(groups.keys()).sort(compareRisk);
+  const matches = (risk, key) => groups.get(risk).filter((row) => obraStatusKey(row) === key);
+  const max = Math.max(1, ...risks.flatMap((risk) => columns.map((column) => matches(risk, column.key).length)));
+
+  const head = `<tr><th scope="col">Risco</th>${columns.map((column) => `<th scope="col">${escapeHtml(column.label)}</th>`).join("")}<th scope="col">Total</th></tr>`;
+  const bodyRows = risks.map((risk) => {
+    const cells = columns.map((column) => {
+      const cellRows = matches(risk, column.key);
+      const count = cellRows.length;
+      const level = count ? Math.ceil((count / max) * 4) : 0;
+      const attributes = count
+        ? `tabindex="0" ${tipAttributes({ value: `${count} obra(s)`, label: `Risco ${risk} • ${column.label}`, detail: kmList(cellRows) })}`
+        : "";
+      return `<td class="heat-cell heat-${level}" ${attributes}>${count}</td>`;
+    }).join("");
+    return `<tr><th scope="row">${escapeHtml(risk)}</th>${cells}<td class="heat-total">${groups.get(risk).length}</td></tr>`;
+  }).join("");
+  const foot = `<tr><th scope="row">Total</th>${columns.map((column) => `<td class="heat-total">${rows.filter((row) => obraStatusKey(row) === column.key).length}</td>`).join("")}<td class="heat-total">${rows.length}</td></tr>`;
+
+  return chartCard({
+    span: 6,
+    eyebrow: "Obras",
+    title: "Risco × situação das obras",
+    note: "Quantidade de obras em cada combinação; tons mais escuros indicam mais obras",
+    body: `<div class="table-wrap heat-wrap"><table class="heat-table"><thead>${head}</thead><tbody>${bodyRows}</tbody><tfoot>${foot}</tfoot></table></div>`,
+  });
+}
+
+function obrasPorSubChart(rows) {
+  const items = statusBreakdown(rows, (row) => String(row.sub || "Sem SUB"), obraStatusKey);
+  const max = Math.max(0, ...items.map((item) => item.total));
+
+  const body = stackedBars(
+    items,
+    OBRA_STATUS_SERIES,
+    max,
+    (item) => `<strong>${item.total}</strong> obra(s)`,
+    (item, series, count) => ({
+      value: `${count} de ${item.total} obra(s)`,
+      label: `SUB ${item.key} • ${series.label}`,
+      detail: kmList(rows.filter((row) => String(row.sub || "Sem SUB") === item.key && obraStatusKey(row) === series.key)),
+    })
+  );
+
+  return chartCard({
+    span: 6,
+    eyebrow: "Obras",
+    title: "Obras por SUB e situação",
+    note: "Quantidade de obras cadastradas em cada SUB",
+    legend: chartLegend(OBRA_STATUS_SERIES.map((series) => ({ tone: series.key, label: series.label }))),
+    body,
+    table: simpleTable(
+      ["SUB", ...OBRA_STATUS_SERIES.map((series) => series.label), "Total"],
+      items.map((item) => [`SUB ${item.key}`, ...OBRA_STATUS_SERIES.map((series) => String(item.counts[series.key])), String(item.total)])
+    ),
+  });
+}
+
+function statusBreakdown(rows, getGroup, getStatus) {
+  const groups = groupRows(rows, getGroup);
+  return Array.from(groups.keys()).sort(sortNumericText).map((key) => {
+    const list = groups.get(key);
+    const counts = { concluido: 0, andamento: 0, pendente: 0 };
+    list.forEach((row) => {
+      counts[getStatus(row)] += 1;
+    });
+    return { key, total: list.length, counts };
+  });
+}
+
+function stackedBars(items, series, max, valueHtml, tip) {
+  return `<div class="bar-list">${items.map((item) => `
+    <div class="bar-row">
+      <span class="bar-label">SUB ${escapeHtml(item.key)}</span>
+      <span class="bar-line">
+        <span class="stack" style="--t:${ratio(item.total, max)}">${series
+          .filter((entry) => item.counts[entry.key] > 0)
+          .map((entry) => `<span class="seg tone-${entry.key}" tabindex="0" style="--n:${item.counts[entry.key]}" ${tipAttributes(tip(item, entry, item.counts[entry.key]))}></span>`)
+          .join("")}</span>
+        <span class="bar-value">${valueHtml(item)}</span>
+      </span>
+    </div>
+  `).join("")}</div>`;
+}
+
+function chartCard({ span, className = "", eyebrow, title, note = "", legend = "", body, table = "" }) {
+  return `
+    <article class="surface-card chart-card span-${span} ${className}">
+      <div class="card-head">
+        <div>
+          <span class="eyebrow">${escapeHtml(eyebrow)}</span>
+          <h3>${escapeHtml(title)}</h3>
+          ${note ? `<p class="chart-note">${escapeHtml(note)}</p>` : ""}
+        </div>
+        ${table ? `<button class="chart-view-toggle" type="button" aria-pressed="false">Ver tabela</button>` : ""}
+      </div>
+      <div class="chart-view">${legend}${body}</div>
+      ${table ? `<div class="table-wrap chart-table">${table}</div>` : ""}
+    </article>
+  `;
+}
+
+function chartLegend(items) {
+  return `<div class="chart-legend">${items.map((item) => `
+    <span class="legend-item"><i class="swatch tone-${item.tone}" aria-hidden="true"></i>${escapeHtml(item.label)}</span>
+  `).join("")}</div>`;
+}
+
+function simpleTable(columns, rows, numericFrom = 1) {
+  const cellClass = (index) => (index >= numericFrom ? ' class="num"' : "");
+  return `
+    <table>
+      <thead><tr>${columns.map((column, index) => `<th scope="col"${cellClass(index)}>${escapeHtml(column)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((row) => `<tr>${row.map((value, index) => `<td${cellClass(index)}>${escapeHtml(value)}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table>
+  `;
+}
+
+function tipAttributes({ value, label, detail = "" }) {
+  return `data-tip-value="${escapeAttribute(value)}" data-tip-label="${escapeAttribute(label)}" data-tip-detail="${escapeAttribute(detail)}"`;
+}
+
+function limpezaStatus(row) {
+  if (row.ext > 0 && row.extReal >= row.ext) return "concluido";
+  return row.extReal > 0 ? "andamento" : "pendente";
+}
+
+function obraStatusKey(row) {
+  const progress = statusToProgress(row.status);
+  if (progress === 1) return "concluido";
+  return progress > 0 ? "andamento" : "pendente";
+}
+
+function activityLabel(code) {
+  const key = String(code || "").trim().toUpperCase();
+  return ACTIVITY_LABELS[key] || key || "Sem ATV";
+}
+
+function riskLabel(row) {
+  const normalized = normalizeHeader(row.risco);
+  if (normalized.includes("ALTO")) return "Alto";
+  if (normalized.includes("MODERADO")) return "Moderado";
+  if (normalized.includes("BAIXO")) return "Baixo";
+  const text = cleanOptional(row.risco);
+  return text && !normalized.includes("NAO INFORMADO") ? text : "Não informado";
+}
+
+function compareRisk(a, b) {
+  const rank = (risk) => {
+    const index = RISK_ORDER.indexOf(risk);
+    if (index >= 0) return index;
+    return risk === "Não informado" ? RISK_ORDER.length + 1 : RISK_ORDER.length;
+  };
+  return rank(a) - rank(b) || a.localeCompare(b, "pt-BR");
+}
+
+function kmList(rows) {
+  const kms = rows.map((row) => `KM ${formatKm(row.km)}`);
+  return kms.length > 4 ? `${kms.slice(0, 4).join(" • ")} +${kms.length - 4}` : kms.join(" • ");
+}
+
+function groupRows(rows, getKey) {
+  const groups = new Map();
+  rows.forEach((row) => {
+    const key = getKey(row);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+  return groups;
+}
+
+function ratio(part, whole) {
+  return whole ? part / whole : 0;
+}
+
+// formatPercent trata valores > 1 como já percentuais; aqui a razão é sempre 0–1+ (ex.: 1,13 = 113%).
+function formatRatio(value) {
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format((Number(value) || 0) * 100)}%`;
+}
+
+function formatLength(meters) {
+  const number = Number(meters) || 0;
+  if (Math.abs(number) < 1000) return formatMeters(number);
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(number / 1000)} km`;
+}
+
+// ----- Interação: tooltip, mapa linear e alternância gráfico/tabela -----
+
+function bindChartInteractions() {
+  const container = document.getElementById("overviewCharts");
+  if (!container) return;
+
+  container.addEventListener("pointermove", (event) => {
+    const track = event.target.closest(".lm-track");
+    if (track) {
+      if (!showLinemapTip(track, event.clientX, event.clientY)) hideChartTooltip();
+      return;
+    }
+
+    clearLinemapHover();
+    const mark = event.target.closest("[data-tip-value]");
+    if (mark) showChartTooltip(tipFromDataset(mark), event.clientX, event.clientY);
+    else hideChartTooltip();
+  });
+
+  container.addEventListener("pointerleave", () => {
+    clearLinemapHover();
+    hideChartTooltip();
+  });
+
+  container.addEventListener("focusin", (event) => {
+    const mark = event.target.closest("[data-tip-value]");
+    if (!mark) return;
+    const rect = mark.getBoundingClientRect();
+    showChartTooltip(tipFromDataset(mark), rect.left + rect.width / 2, rect.top);
+  });
+
+  container.addEventListener("focusout", hideChartTooltip);
+
+  container.addEventListener("click", (event) => {
+    const toggle = event.target.closest(".chart-view-toggle");
+    if (!toggle) return;
+    const card = toggle.closest(".chart-card");
+    const showTable = card.classList.toggle("show-table");
+    toggle.setAttribute("aria-pressed", String(showTable));
+    toggle.textContent = showTable ? "Ver gráfico" : "Ver tabela";
+    hideChartTooltip();
+  });
+
+  window.addEventListener("scroll", hideChartTooltip, { passive: true });
+}
+
+function tipFromDataset(element) {
+  return { value: element.dataset.tipValue, label: element.dataset.tipLabel, detail: element.dataset.tipDetail };
+}
+
+function showLinemapTip(track, clientX, clientY) {
+  const data = linemapData.get(track.dataset.sub);
+  if (!data) return false;
+
+  const rect = track.getBoundingClientRect();
+  const km = data.start + ((clientX - rect.left) / rect.width) * data.span;
+  const tolerance = (8 / rect.width) * data.span;
+  let nearest = -1;
+  let nearestDistance = Infinity;
+
+  data.segments.forEach((segment, index) => {
+    const distance = km < segment.start ? segment.start - km : km > segment.end ? km - segment.end : 0;
+    if (distance < nearestDistance) {
+      nearest = index;
+      nearestDistance = distance;
+    }
+  });
+
+  const found = nearest >= 0 && nearestDistance <= tolerance;
+  clearLinemapHover();
+  if (!found) return false;
+
+  track.querySelectorAll(`[data-i="${nearest}"]`).forEach((mark) => mark.classList.add("is-hover"));
+  const { row } = data.segments[nearest];
+  showChartTooltip({
+    value: `${formatMeters(row.extReal)} de ${formatMeters(row.ext)} (${formatRatio(ratio(row.extReal, row.ext))})`,
+    label: row.equipInfra || "Frente sem código de equipamento",
+    detail: `${activityLabel(row.atividade)} • km ${formatKm(row.kmi)} a ${formatKm(row.kmf)}`,
+  }, clientX, clientY);
+  return true;
+}
+
+function clearLinemapHover() {
+  document.querySelectorAll("#overviewCharts .is-hover").forEach((mark) => mark.classList.remove("is-hover"));
+}
+
+function chartTooltip() {
+  let tip = document.getElementById("chartTooltip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.id = "chartTooltip";
+    tip.className = "chart-tooltip";
+    tip.setAttribute("role", "tooltip");
+    ["strong", "span", "small"].forEach((tag) => tip.appendChild(document.createElement(tag)));
+    document.body.appendChild(tip);
+  }
+  return tip;
+}
+
+// Rótulos vêm da planilha: sempre textContent, nunca innerHTML.
+function showChartTooltip({ value, label, detail }, x, y) {
+  const tip = chartTooltip();
+  const [valueEl, labelEl, detailEl] = tip.children;
+  valueEl.textContent = value || "";
+  labelEl.textContent = label || "";
+  detailEl.textContent = detail || "";
+  detailEl.hidden = !detail;
+  tip.classList.add("show");
+
+  const { width, height } = tip.getBoundingClientRect();
+  const left = Math.min(Math.max(8, x + 14), window.innerWidth - width - 8);
+  const top = y - height - 12 < 8 ? y + 18 : y - height - 12;
+  tip.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+}
+
+function hideChartTooltip() {
+  document.getElementById("chartTooltip")?.classList.remove("show");
 }
 
 function renderLimpeza() {

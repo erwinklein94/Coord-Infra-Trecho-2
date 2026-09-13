@@ -25,6 +25,11 @@ A estrutura das colunas deve seguir a planilha usada como modelo neste projeto.
 ## Dashboards incluídos
 
 - **Visão geral**
+  - Indicadores de limpeza e obras
+  - Mapa linear das frentes ao longo do km, por SUB (executado × a executar)
+  - Saldo a executar por SUB, frentes por situação e limpeza por tipo de seção (corte, aterro, seção mista)
+  - Matriz risco × situação das obras e obras por SUB
+  - Cada gráfico tem tooltip e botão "Ver tabela" com os mesmos números
 - **Limpeza Geral**
   - Cards por SUB
   - Percentual por SUB
